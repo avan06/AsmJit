@@ -5,60 +5,58 @@ using AsmJit.CompilerContext;
 
 namespace AsmJitTest.TestCases
 {
-	public sealed class AllocMany2 : CompilerTestCase<Action<IntPtr>>
-	{
-		protected override void Compile(CodeContext c)
-		{
-			var var = new GpVariable[32];
+    public sealed class AllocMany2 : CompilerTestCase<Action<IntPtr>>
+    {
+        protected override void Compile(CodeContext c)
+        {
+            var var = new GpVariable[32];
 
-			var a = c.IntPtr("a");
+            var a = c.SetArgument(c.IntPtr("a"));
 
-			c.SetArgument(0, a);
+            int i;
+            for (i = 0; i < var.Length; i++)
+            {
+                var[i] = c.Int32("var" + i);
+            }
 
-			int i;
-			for (i = 0; i < var.Length; i++)
-			{
-				var[i] = c.Int32("var" + i);
-			}
+            for (i = 0; i < var.Length; i++)
+            {
+                c.Emit(InstructionId.Xor, var[i], var[i]);
+            }
 
-			for (i = 0; i < var.Length; i++)
-			{
-				c.Xor(var[i], var[i]);
-			}
+            var v0 = c.Int32("v0");
+            var l = c.Label();
 
-			var v0 = c.Int32("v0");
-			var l = c.Label();
+            c.Emit(InstructionId.Mov, v0, (Immediate)32);
+            c.Bind(l);
 
-			c.Mov(v0, 32);
-			c.Bind(l);
+            for (i = 0; i < var.Length; i++)
+            {
+                c.Emit(InstructionId.Add, var[i], (Immediate)i);
+            }
 
-			for (i = 0; i < var.Length; i++)
-			{
-				c.Add(var[i], i);
-			}
+            c.Emit(InstructionId.Dec, v0);
+            c.Emit(InstructionId.Jnz, l);
 
-			c.Dec(v0);
-			c.Jnz(l);
+            for (i = 0; i < var.Length; i++)
+            {
+                c.Emit(InstructionId.Mov, Memory.DWord(a, i * 4), var[i]);
+            }
+        }
 
-			for (i = 0; i < var.Length; i++)
-			{
-				c.Mov(Memory.DWord(a, i * 4), var[i]);
-			}
-		}
+        protected override void Execute(Action<IntPtr> fn, out string result, out string expected)
+        {
+            var x = new int[32];
+            unsafe
+            {
 
-		protected override void Execute(Action<IntPtr> fn, out string result, out string expected)
-		{
-			var x = new int[32];
-			unsafe
-			{
-
-				fixed (int* px = x)
-				{
-					fn((IntPtr) px);
-				}
-			}
-			result = string.Join(",", x);
-			expected = string.Join(",", new int[32].InitializeWith(i => i * 32));
-		}
-	}
+                fixed (int* px = x)
+                {
+                    fn((IntPtr) px);
+                }
+            }
+            result = string.Join(",", x);
+            expected = string.Join(",", new int[32].InitializeWith(i => i * 32));
+        }
+    }
 }

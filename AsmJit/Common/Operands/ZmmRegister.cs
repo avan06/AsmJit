@@ -9,9 +9,6 @@ namespace AsmJit.Common.Operands
 			Size = 64;
 		}
 
-		internal ZmmRegister(ZmmRegister other) 
-			: base(other)
-		{
-		}
+		internal ZmmRegister(ZmmRegister other) : base(other) { }
 	}
 }

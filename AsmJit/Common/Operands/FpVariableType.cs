@@ -1,8 +1,8 @@
 namespace AsmJit.Common.Operands
 {
-	internal enum FpVariableType
-	{
-		Fp32 = 10,
-		Fp64 = 11
-	}
+    internal enum FpVariableType
+    {
+        Fp32 = 10,
+        Fp64 = 11
+    }
 }

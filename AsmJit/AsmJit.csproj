@@ -9,8 +9,9 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>AsmJit</RootNamespace>
     <AssemblyName>AsmJit</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -44,7 +45,6 @@
   <ItemGroup>
     <Compile Include="AssemblerContext\Assembler.cs" />
     <Compile Include="AssemblerContext\AssemblerFeatures.cs" />
-    <Compile Include="AssemblerContext\CodeContext.Registers.cs" />
     <Compile Include="AssemblerContext\CodeContext.Instructions.cs" />
     <Compile Include="AssemblerContext\CodeBuffer.cs" />
     <Compile Include="Common\Data.cs" />
@@ -74,10 +74,7 @@
     <Compile Include="CompilerContext\ConstantPool.cs" />
     <Compile Include="AssemblerContext\ExtendedInstructionInfo.cs" />
     <Compile Include="AssemblerContext\InstructionEncoding.cs" />
-    <Compile Include="AssemblerContext\InstructionExtendedIndex.cs" />
     <Compile Include="Common\InstructionIdExtensions.cs" />
-    <Compile Include="AssemblerContext\InstructionInfo.cs" />
-    <Compile Include="AssemblerContext\InstructionNameIndex.cs" />
     <Compile Include="AssemblerContext\LabelData.cs" />
     <Compile Include="Common\InstructionId.cs" />
     <Compile Include="AssemblerContext\InstructionOptions.cs" />

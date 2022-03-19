@@ -11,24 +11,21 @@ namespace AsmJit.Common
 
 		internal static Pointer Invalid = new Pointer();
 
-		internal unsafe Pointer(void* ptr, int dataSize = 0, PointerFlags flags = PointerFlags.None)
-			: this()
+		internal unsafe Pointer(void* ptr, int dataSize = 0, PointerFlags flags = PointerFlags.None) : this()
 		{
 			DataSize = dataSize;
 			_ptr = (byte*)ptr;
 			Flags = flags;
 		}
 
-		internal unsafe Pointer(byte* ptr, int dataSize = 0, PointerFlags flags = PointerFlags.None)
-			: this()
+		internal unsafe Pointer(byte* ptr, int dataSize = 0, PointerFlags flags = PointerFlags.None) : this()
 		{
 			DataSize = dataSize;
 			_ptr = ptr;
 			Flags = flags;
 		}
 
-		internal unsafe Pointer(IntPtr ptr, int dataSize = 0, PointerFlags flags = PointerFlags.None)
-			: this()
+		internal unsafe Pointer(IntPtr ptr, int dataSize = 0, PointerFlags flags = PointerFlags.None) : this()
 		{
 			DataSize = dataSize;
 			_ptr = (byte*)ptr;
@@ -79,22 +76,13 @@ namespace AsmJit.Common
 			}
 		}
 
-		public static bool operator <(Pointer p1, Pointer p2)
-		{
-			return !(p1 > p2);
-		}
+        public static bool operator <(Pointer p1, Pointer p2) => !(p1 > p2);
 
-		public static bool operator <=(Pointer p1, Pointer p2)
-		{
-			return (p1 < p2) || (p1 == p2);
-		}
+        public static bool operator <=(Pointer p1, Pointer p2) => (p1 < p2) || (p1 == p2);
 
-		public static bool operator >=(Pointer p1, Pointer p2)
-		{
-			return (p1 > p2) || (p1 == p2);
-		}
+        public static bool operator >=(Pointer p1, Pointer p2) => (p1 > p2) || (p1 == p2);
 
-		public static bool operator ==(Pointer p1, Pointer p2)
+        public static bool operator ==(Pointer p1, Pointer p2)
 		{
 			unsafe
 			{
@@ -102,12 +90,9 @@ namespace AsmJit.Common
 			}
 		}
 
-		public static bool operator !=(Pointer p1, Pointer p2)
-		{
-			return !(p1 == p2);
-		}
+        public static bool operator !=(Pointer p1, Pointer p2) => !(p1 == p2);
 
-		public static implicit operator IntPtr(Pointer p)
+        public static implicit operator IntPtr(Pointer p)
 		{
 			unsafe
 			{
@@ -123,18 +108,12 @@ namespace AsmJit.Common
 			}
 		}
 
-		public static implicit operator Pointer(IntPtr p)
-		{
-			return new Pointer(p);
-		}
+        public static implicit operator Pointer(IntPtr p) => new Pointer(p);
 
 
-		public static unsafe implicit operator Pointer(void* p)
-		{
-			return new Pointer(p);
-		}
+        public static unsafe implicit operator Pointer(void* p) => new Pointer(p);
 
-		internal bool Equals(Pointer other)
+        internal bool Equals(Pointer other)
 		{
 			unsafe
 			{

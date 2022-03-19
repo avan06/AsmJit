@@ -1,56 +1,55 @@
 using System;
+using AsmJit.Common;
+using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 
 namespace AsmJitTest.TestCases
 {
-	public sealed class AllocIfElse4 : CompilerTestCase<Func<int, int, int>>
-	{
-		protected override void Compile(CodeContext c)
-		{
-			var v1 = c.Int32("v1");
-			var v2 = c.Int32("v2");
+    public sealed class AllocIfElse4 : CompilerTestCase<Func<int, int, int>>
+    {
+        protected override void Compile(CodeContext c)
+        {
+            var v1 = c.SetArgument(c.Int32("v1"));
+            var v2 = c.SetArgument(c.Int32("v2"));
 
-			c.SetArgument(0, v1);
-			c.SetArgument(1, v2);
+            var counter = c.Int32("counter");
 
-			var counter = c.Int32("counter");
+            var l1 = c.Label();
+            var loop1 = c.Label();
+            var loop2 = c.Label();
+            var exit = c.Label();
 
-			var l1 = c.Label();
-			var loop1 = c.Label();
-			var loop2 = c.Label();
-			var exit = c.Label();
+            c.Emit(InstructionId.Mov, counter, (Immediate)0);
 
-			c.Mov(counter, 0);
+            c.Emit(InstructionId.Cmp, v1, v2);
+            c.Emit(InstructionId.Jg, l1);
 
-			c.Cmp(v1, v2);
-			c.Jg(l1);
+            c.Bind(loop1);
+            c.Emit(InstructionId.Mov, v1, counter);
 
-			c.Bind(loop1);
-			c.Mov(v1, counter);
+            c.Emit(InstructionId.Inc, counter);
+            c.Emit(InstructionId.Cmp, counter, (Immediate)1);
+            c.Emit(InstructionId.Jle, loop1);
+            c.Emit(InstructionId.Jmp, exit);
 
-			c.Inc(counter);
-			c.Cmp(counter, 1);
-			c.Jle(loop1);
-			c.Jmp(exit);
+            c.Bind(l1);
+            c.Bind(loop2);
+            c.Emit(InstructionId.Mov, v1, counter);
+            c.Emit(InstructionId.Inc, counter);
+            c.Emit(InstructionId.Cmp, counter, (Immediate)2);
+            c.Emit(InstructionId.Jle, loop2);
 
-			c.Bind(l1);
-			c.Bind(loop2);
-			c.Mov(v1, counter);
-			c.Inc(counter);
-			c.Cmp(counter, 2);
-			c.Jle(loop2);
+            c.Bind(exit);
+            c.Ret(v1);
+        }
 
-			c.Bind(exit);
-			c.Ret(v1);
-		}
+        protected override void Execute(Func<int, int, int> fn, out string result, out string expected)
+        {
+            var r1 = fn(0, 1);
+            var r2 = fn(1, 0);
 
-		protected override void Execute(Func<int, int, int> fn, out string result, out string expected)
-		{
-			var r1 = fn(0, 1);
-			var r2 = fn(1, 0);
-
-			result = r1 + " " + r2;
-			expected = 1 + " " + 2;
-		}
-	}
+            result = r1 + " " + r2;
+            expected = 1 + " " + 2;
+        }
+    }
 }

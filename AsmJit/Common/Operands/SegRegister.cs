@@ -9,9 +9,6 @@ namespace AsmJit.Common.Operands
 			Size = 2;
 		}
 
-		internal SegRegister(SegRegister other)
-			: base(other)
-		{
-		}
+		internal SegRegister(SegRegister other) : base(other) { }
 	}
 }
