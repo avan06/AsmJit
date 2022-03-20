@@ -1,148 +1,137 @@
 using System.Collections.Generic;
-using AsmJit.AssemblerContext;
 using AsmJit.Common;
+using AsmJit.Common.Enums;
+using AsmJit.Common.Extensions;
 using AsmJit.Common.Operands;
+using AsmJit.Common.Variables;
 using AsmJit.CompilerContext.CodeTree;
 
 namespace AsmJit.CompilerContext
 {
-	internal class VariableContext
-	{
-		private VariableAttributes[] _tmpList = new VariableAttributes[80].InitializeWith(() => new VariableAttributes());
-		
-		public VariableContext()
-		{
-			JccList = new List<CodeNode>();
-			ReturningList = new List<CodeNode>();
-			ContextVd = new List<VariableData>();
-			ClobberedRegs = new RegisterMask();
-			GaRegs = new Dictionary<RegisterClass, int>();
-			GaRegs[RegisterClass.Gp] = (int)(Utils.Bits(Cpu.Info.RegisterCount.Gp) & ~Utils.Mask(RegisterIndex.Sp));
-			GaRegs[RegisterClass.Mm] = (int)Utils.Bits(Cpu.Info.RegisterCount.Mm);
-			GaRegs[RegisterClass.K] = (int)Utils.Bits(Cpu.Info.RegisterCount.K);
-			GaRegs[RegisterClass.Xyz] = (int)Utils.Bits(Cpu.Info.RegisterCount.Xyz);
-			State = new VariableState(0);
-		}
+    internal class VariableContext
+    {
+        private VariableAttributes[] _tmpList = new VariableAttributes[80].InitializeWith(() => new VariableAttributes());
 
-		public VariableState State { get; private set; }
+        public readonly VariableState State;
 
-		public Dictionary<RegisterClass, int> GaRegs { get; private set; }
+        public readonly Dictionary<RegisterClass, int> GaRegs;
 
-		public List<VariableData> ContextVd { get; private set; }
+        public readonly List<VariableData> ContextVd;
 
-		public List<CodeNode> ReturningList { get; private set; }
+        public readonly List<CodeNode> ReturningList;
 
-		public int VariableCount { get; set; }
+        public int VariableCount;
 
-		public RegisterCount RegCount { get; private set; }
+        public readonly List<CodeNode> JccList;
 
-		public RegisterMask InRegs { get; private set; }
+        public VariableContext()
+        {
+            JccList = new List<CodeNode>();
+            ReturningList = new List<CodeNode>();
+            ContextVd = new List<VariableData>();
+            ClobberedRegs = new RegisterMask();
+            GaRegs = new Dictionary<RegisterClass, int>
+            {
+                [RegisterClass.Gp] = (int)(Utils.Bits(Cpu.Info.RegisterCount.Gp) & ~Utils.Mask(RegisterIndex.Sp)),
+                [RegisterClass.Mm] = (int)Utils.Bits(Cpu.Info.RegisterCount.Mm),
+                [RegisterClass.K] = (int)Utils.Bits(Cpu.Info.RegisterCount.K),
+                [RegisterClass.Xyz] = (int)Utils.Bits(Cpu.Info.RegisterCount.Xyz)
+            };
+            State = new VariableState(0);
+        }
 
-		public RegisterMask OutRegs { get; private set; }
+        public RegisterCount RegCount { get; private set; }
 
-		public RegisterMask ClobberedRegs { get; private set; }
+        public RegisterMask InRegs { get; private set; }
 
-		public List<CodeNode> JccList { get; private set; }
+        public RegisterMask OutRegs { get; private set; }
 
-		public VariableAttributes this[int i]
-		{
-			get { return _tmpList[i]; }
-		}
+        public RegisterMask ClobberedRegs { get; private set; }
 
-		public void Begin()
-		{
-			RegCount = new RegisterCount();
-			InRegs = new RegisterMask();
-			OutRegs = new RegisterMask();
-			ClobberedRegs = new RegisterMask();
-		}
+        public VariableAttributes this[int i] => _tmpList[i];
 
-		public VariableAttributes Add(VariableData vd, VariableFlags flags, int newAllocable)
-		{
-			var va = _tmpList[VariableCount++];
-			va.Setup(vd, flags, 0, newAllocable);
-			va.UsageCount += 1;
-			vd.Attributes = va;
+        public void Begin()
+        {
+            RegCount = new RegisterCount();
+            InRegs = new RegisterMask();
+            OutRegs = new RegisterMask();
+            ClobberedRegs = new RegisterMask();
+        }
 
-			RegisterContextVariable(vd);
-			RegCount.Add(vd.Info.RegisterClass);
-			return va;
-		}
+        public VariableAttributes Add(VariableData vd, VariableFlags flags, int newAllocable)
+        {
+            var va = _tmpList[VariableCount++];
+            va.Setup(vd, flags, 0, newAllocable);
+            va.UsageCount += 1;
+            vd.Attributes = va;
 
-		public VariableAttributes Merge(VariableData vd, VariableFlags flags, int newAllocable)
-		{
-			var va = vd.Attributes;
-			if (va == null)
-			{
-				va = _tmpList[VariableCount++];
-				va.Setup(vd, flags, 0, newAllocable);
-				vd.Attributes = va;
+            RegisterContextVariable(vd);
+            RegCount.Add(vd.Info.RegisterClass);
+            return va;
+        }
 
-				RegisterContextVariable(vd);
-				RegCount.Add(vd.Info.RegisterClass);
-			}
-			va.Flags |= flags;
-			va.UsageCount++;
-			return va;
-		}
+        public VariableAttributes Merge(VariableData vd, VariableFlags flags, int newAllocable)
+        {
+            var va = vd.Attributes;
+            if (va == null)
+            {
+                va = _tmpList[VariableCount++];
+                va.Setup(vd, flags, 0, newAllocable);
+                vd.Attributes = va;
 
-		public void End(CodeNode node)
-		{
-			if (VariableCount == 0 && ClobberedRegs.IsEmpty) return;
+                RegisterContextVariable(vd);
+                RegCount.Add(vd.Info.RegisterClass);
+            }
+            va.Flags |= flags;
+            va.UsageCount++;
+            return va;
+        }
 
-			var vaIndex = new RegisterCount();
-			vaIndex.IndexFrom(RegCount);
+        public void End(CodeNode node)
+        {
+            if (VariableCount == 0 && ClobberedRegs.IsEmpty) return;
 
-			var vaMap = new VariableMap(VariableCount);
+            var vaIndex = new RegisterCount();
+            vaIndex.IndexFrom(RegCount);
 
-			vaMap.Count.CopyFrom(RegCount);
-			vaMap.Start.CopyFrom(vaIndex);
-			vaMap.InRegs.CopyFrom(InRegs);
-			vaMap.OutRegs.CopyFrom(OutRegs);
-			vaMap.ClobberedRegs.CopyFrom(ClobberedRegs);
+            var vaMap = new VariableMap(VariableCount);
 
-			var vi = 0;
-			while (VariableCount != 0)
-			{
-				var va = _tmpList[vi];
-				var vd = va.VariableData;
+            vaMap.Count.CopyFrom(RegCount);
+            vaMap.Start.CopyFrom(vaIndex);
+            vaMap.InRegs.CopyFrom(InRegs);
+            vaMap.OutRegs.CopyFrom(OutRegs);
+            vaMap.ClobberedRegs.CopyFrom(ClobberedRegs);
 
-				var @class = vd.Info.RegisterClass;
-				var dstIndex = vaIndex.Get(@class);
+            var vi = 0;
+            while (VariableCount != 0)
+            {
+                var va = _tmpList[vi];
+                var vd = va.VariableData;
 
-				vaIndex.Add(@class);
+                var rClass = vd.Info.RegisterClass;
+                var dstIndex = vaIndex.Get(rClass);
 
-				if (va.InRegs != 0)
-				{
-					va.AllocableRegs = va.InRegs;
-				}
-				else if (va.OutRegIndex != RegisterIndex.Invalid)
-				{
-					va.AllocableRegs = Utils.Mask(va.OutRegIndex);
-				}
-				else
-				{
-					va.AllocableRegs &= ~InRegs.Get(@class);
-				}
+                vaIndex.Add(rClass);
 
-				vd.Attributes = null;
-				vaMap.Attributes[dstIndex].CopyFrom(va);
-				vi++;
-				VariableCount--;
-			}
-			node.VariableMap = vaMap;
-			return;
-		}
+                if (va.InRegs != 0) va.AllocableRegs = va.InRegs;
+                else if (va.OutRegIndex != RegisterIndex.Invalid) va.AllocableRegs = Utils.Mask(va.OutRegIndex);
+                else va.AllocableRegs &= ~InRegs.Get(rClass);
 
-		public void RegisterContextVariable(VariableData vd)
-		{
-			if (vd.LocalId != Constants.InvalidId)
-			{
-				return;
-			}
+                vd.Attributes = null;
+                vaMap.Attributes[dstIndex].CopyFrom(va);
+                vi++;
+                VariableCount--;
+            }
+            node.VariableMap = vaMap;
+            return;
+        }
 
-			vd.LocalId = ContextVd.Count;
-			ContextVd.Add(vd);
-		}
-	}
+        public void RegisterContextVariable(VariableData vd)
+        {
+            if (vd.LocalId != Constants.InvalidId) return;
+
+            vd.LocalId = ContextVd.Count;
+            ContextVd.Add(vd);
+        }
+    }
 }

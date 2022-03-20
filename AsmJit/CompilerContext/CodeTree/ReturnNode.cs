@@ -4,6 +4,8 @@ namespace AsmJit.CompilerContext.CodeTree
 {
     internal sealed class ReturnNode : CodeNode
     {
+        public readonly Operand[] Operands;
+
         public ReturnNode(Operand o0 = null, Operand o1 = null) : base(CodeNodeType.Return)
         {
             if (o0 == null) o0 = Operand.Invalid;
@@ -13,7 +15,5 @@ namespace AsmJit.CompilerContext.CodeTree
             Operands[1] = o1;
             Flags |= CodeNodeFlags.Ret;
         }
-
-        public Operand[] Operands { get; private set; }
     }
 }

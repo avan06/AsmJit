@@ -1,8 +1,9 @@
 using System;
 using System.Globalization;
-using AsmJit.Common;
+using AsmJit.Common.Enums;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
+using AsmJit.CompilerContext.CodeTree;
 
 namespace AsmJitTest.TestCases
 {
@@ -16,17 +17,19 @@ namespace AsmJitTest.TestCases
             var arg = c.XmmSd("arg");
             var ret = c.XmmSd("ret");
 
-            var fp = Memory.Fn(new Func<double, double>(CalledFunction));
+            var fp = FnPointer.Fn(new Func<double, double>(CalledFunction));
 
-            c.Emit(InstructionId.Movsd, arg, Memory.Ptr(p));
-            c.Emit(InstructionId.Mov, fn, fp);
+            c.Emit(
+                InstructionId.Movsd, arg, Memory.Ptr(p),
+                InstructionId.Mov, fn, fp);
 
             var call = c.Call(fn, fp);
             call.SetArgument(arg);
             call.SetReturn(ret);
 
-            c.Emit(InstructionId.Xorps, arg, arg);
-            c.Emit(InstructionId.Subsd, arg, ret);
+            c.Emit(
+                InstructionId.Xorps, arg, arg,
+                InstructionId.Subsd, arg, ret);
 
             c.Ret(arg);
         }

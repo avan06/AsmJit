@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common;
+using AsmJit.Common.Enums;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 
@@ -23,17 +23,18 @@ namespace AsmJitTest.TestCases
             c.SetArgument(1, a);
             c.SetArgument(2, b);
 
-            c.Emit(InstructionId.Cmp, op, (Immediate)0);
-            c.Emit(InstructionId.Jz, add);
+            c.Emit(
+                InstructionId.Cmp, op, (Immediate)0,
+                InstructionId.Jz, add,
 
-            c.Emit(InstructionId.Cmp, op, (Immediate)1);
-            c.Emit(InstructionId.Jz, sub);
+                InstructionId.Cmp, op, (Immediate)1,
+                InstructionId.Jz, sub,
 
-            c.Emit(InstructionId.Cmp, op, (Immediate)2);
-            c.Emit(InstructionId.Jz, mul);
+                InstructionId.Cmp, op, (Immediate)2,
+                InstructionId.Jz, mul,
 
-            c.Emit(InstructionId.Cmp, op, (Immediate)3);
-            c.Emit(InstructionId.Jz, div);
+                InstructionId.Cmp, op, (Immediate)3,
+                InstructionId.Jz, div);
 
             c.Bind(zero);
             c.Emit(InstructionId.Xor, a, a);
@@ -52,12 +53,14 @@ namespace AsmJitTest.TestCases
             c.Ret(a);
 
             c.Bind(div);
-            c.Emit(InstructionId.Cmp, b, (Immediate)0);
-            c.Emit(InstructionId.Jz, zero);
+            c.Emit(
+                InstructionId.Cmp, b, (Immediate)0,
+                InstructionId.Jz, zero);
 
             var z = c.Int32("z");
-            c.Emit(InstructionId.Xor, z, z);
-            c.Emit(InstructionId.Idiv, z, a, b);
+            c.Emit(
+                InstructionId.Xor, z, z,
+                InstructionId.Idiv, z, a, b);
             c.Ret(a);
         }
 

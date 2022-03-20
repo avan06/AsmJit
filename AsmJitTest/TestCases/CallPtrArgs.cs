@@ -1,7 +1,8 @@
 using System;
-using AsmJit.Common;
+using AsmJit.Common.Enums;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
+using AsmJit.CompilerContext.CodeTree;
 
 namespace AsmJitTest.TestCases
 {
@@ -10,7 +11,7 @@ namespace AsmJitTest.TestCases
         protected override void Compile(CodeContext c)
         {
             var fn = c.IntPtr("fn");
-            var fp = Memory.Fn(new Func<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int>(CalledFunction));
+            var fp = FnPointer.Fn(new Func<IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, IntPtr, int>(CalledFunction));
             c.Emit(InstructionId.Mov, fn, fp);
 
             var call = c.Call(fn, fp);

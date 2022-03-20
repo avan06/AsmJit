@@ -1,8 +1,10 @@
 using System;
 using System.ComponentModel;
-using AsmJit.AssemblerContext;
 using AsmJit.Common;
+using AsmJit.Common.Enums;
+using AsmJit.Common.Extensions;
 using AsmJit.Common.Operands;
+using AsmJit.Common.Variables;
 using AsmJit.CompilerContext.CodeTree;
 
 namespace AsmJit.CompilerContext
@@ -22,7 +24,7 @@ namespace AsmJit.CompilerContext
         private CodeNode _node;
         private CodeNode _next;
         private CodeNode _stopNode;
-        private Assembler _assembler;
+        private AssemblerBase _assemblerBase;
         private Compiler _compiler;
         private CodeContext _codeContext;
         private FunctionNode _functionNode;
@@ -49,9 +51,9 @@ namespace AsmJit.CompilerContext
         private VariableAllocator _variableAllocator;
         private CallAllocator _callAllocator;
 
-        public Translator(Assembler assembler, Compiler compiler, CodeContext codeContext, FunctionNode func, VariableContext ctx)
+        public Translator(AssemblerBase assemblerBase, Compiler compiler, CodeContext codeContext, FunctionNode func, VariableContext ctx)
         {
-            _assembler = assembler;
+            _assemblerBase = assemblerBase;
             _compiler = compiler;
             _codeContext = codeContext;
             _functionNode = func;
@@ -67,8 +69,8 @@ namespace AsmJit.CompilerContext
             _next = null;
             _stopNode = _functionNode.End.Next;
             var result = Result.Break;
-            _variableAllocator = new VariableAllocator(_assembler, _compiler, _codeContext, this, _variableContext);
-            _callAllocator = new CallAllocator(_assembler, _compiler, _codeContext, this, _variableContext);
+            _variableAllocator = new VariableAllocator(_compiler, _codeContext, this, _variableContext);
+            _callAllocator = new CallAllocator(_compiler, _codeContext, this, _variableContext);
             while (true)
             {
                 if (result == Result.Done) break;
@@ -475,10 +477,7 @@ namespace AsmJit.CompilerContext
             _varBaseReg = RegisterIndex.Sp;
             _varBaseOffset = _functionNode.CallStackSize;
 
-            if (!_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsStackAdjusted))
-            {
-                _varBaseOffset = -(_functionNode.AlignStackSize + _functionNode.AlignedMemStackSize + _functionNode.MoveStackSize);
-            }
+            if (!_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsStackAdjusted)) _varBaseOffset = -(_functionNode.AlignStackSize + _functionNode.AlignedMemStackSize + _functionNode.MoveStackSize);
         }
 
         private void ResolveCellOffsets()
@@ -569,8 +568,7 @@ namespace AsmJit.CompilerContext
                     gapSize -= size;
                     gapPos -= size;
 
-                    if (alignment < gapAlignment)
-                        gapAlignment = alignment;
+                    if (alignment < gapAlignment) gapAlignment = alignment;
                 }
                 else
                 {
@@ -634,14 +632,8 @@ namespace AsmJit.CompilerContext
 
             int stackBase;
 
-//			if (func.FunctionFlags.IsSet(FunctionNodeFlags.IsStackAdjusted))
-//			{
-//				stackBase = func.CallStackSize + func.AlignedMemStackSize;
-//			}
-//			else
-//			{
-//				stackBase = -(func.AlignedMemStackSize + func.AlignStackSize + func.ExtraStackSize);
-//			}
+            //if (func.FunctionFlags.IsSet(FunctionNodeFlags.IsStackAdjusted)) stackBase = func.CallStackSize + func.AlignedMemStackSize;
+            //else stackBase = -(func.AlignedMemStackSize + func.AlignStackSize + func.ExtraStackSize);
 
             int i, mask;
             var regsGp = _functionNode.SaveRestoreRegs.Get(RegisterClass.Gp);
@@ -652,7 +644,7 @@ namespace AsmJit.CompilerContext
             var useLeaEpilog = false;
 
             //var gpReg = new GpRegister(_assembler.Zsp);
-            var fpReg = new GpRegister(_assembler.Zbp);
+            var fpReg = new GpRegister(Cpu.Zbp);
 
             // [Prolog]
 
@@ -665,21 +657,21 @@ namespace AsmJit.CompilerContext
             {
                 if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsStackMisaligned))
                 {
-                    fpReg = new GpRegister((GpRegisterType) _assembler.Zsp.RegisterType, _functionNode.StackFrameRegIndex);
-                    fpOffset = Memory.Ptr(_assembler.Zsp, _varBaseOffset + _stackFrameCell.Offset);//new Memory(_assembler.Zsp, _varBaseOffset + _stackFrameCell.Offset);
+                    fpReg = new GpRegister((GpRegisterType)Cpu.Zsp.RegisterType, _functionNode.StackFrameRegIndex);
+                    fpOffset = Memory.Ptr(Cpu.Zsp, _varBaseOffset + _stackFrameCell.Offset);//new Memory(_assembler.Zsp, _varBaseOffset + _stackFrameCell.Offset);
 
                     earlyPushPop = true;
                     EmitPushSequence(regsGp);
 
                     if (_functionNode.IsStackFrameRegPreserved) _compiler.Emit(InstructionId.Push, fpReg);
 
-                    _compiler.Emit(InstructionId.Mov, fpReg, _assembler.Zsp);
+                    _compiler.Emit(InstructionId.Mov, fpReg, Cpu.Zsp);
                 }
             }
             else
             {
                 _compiler.Emit(InstructionId.Push, fpReg);
-                _compiler.Emit(InstructionId.Mov, fpReg, _assembler.Zsp);
+                _compiler.Emit(InstructionId.Mov, fpReg, Cpu.Zsp);
             }
 
             if (!earlyPushPop)
@@ -693,9 +685,9 @@ namespace AsmJit.CompilerContext
             {
                 stackBase = _functionNode.AlignedMemStackSize + _functionNode.CallStackSize;
 
-                if (stackSize != 0) _compiler.Emit(InstructionId.Sub, _assembler.Zsp, (Immediate)stackSize);
+                if (stackSize != 0) _compiler.Emit(InstructionId.Sub, Cpu.Zsp, (Immediate)stackSize);
 
-                if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsStackMisaligned)) _compiler.Emit(InstructionId.And, _assembler.Zsp, (Immediate)(-stackAlignment));
+                if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsStackMisaligned)) _compiler.Emit(InstructionId.And, Cpu.Zsp, (Immediate)(-stackAlignment));
 
                 if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsStackMisaligned) && _functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsNaked)) _compiler.Emit(InstructionId.Mov, fpOffset, fpReg);
             }
@@ -706,14 +698,14 @@ namespace AsmJit.CompilerContext
             for (i = 0, mask = regsXmm; mask != 0; i++, mask >>= 1)
             {
                 if (!mask.IsSet(0x1)) continue;
-                _compiler.Emit(InstructionId.Movaps, Memory.OWordPtr(_assembler.Zsp, stackPtr), Compiler.Xmm(i));
+                _compiler.Emit(InstructionId.Movaps, Memory.OWordPtr(Cpu.Zsp, stackPtr), Cpu.Xmm(i));
                 stackPtr += 16;
             }
 
             for (i = 0, mask = regsMm; mask != 0; i++, mask >>= 1)
             {
                 if (!mask.IsSet(0x1)) continue;
-                _compiler.Emit(InstructionId.Movq, Memory.QWord(_assembler.Zsp, stackPtr), Compiler.Mm(i));
+                _compiler.Emit(InstructionId.Movq, Memory.QWord(Cpu.Zsp, stackPtr), Cpu.Mm(i));
                 stackPtr += 8;
             }
 
@@ -732,20 +724,17 @@ namespace AsmJit.CompilerContext
                 for (i = 0; i < _functionNode.StackFrameCopyGpIndex.Length; i++)
                 {
                     if (_functionNode.StackFrameCopyGpIndex[i] == RegisterIndex.Invalid) continue;
-                    r[numRegs++] = new GpRegister((GpRegisterType)_assembler.Zsp.RegisterType, _functionNode.StackFrameCopyGpIndex[i]);
+                    r[numRegs++] = new GpRegister((GpRegisterType)Cpu.Zsp.RegisterType, _functionNode.StackFrameCopyGpIndex[i]);
                 }
                 if (numRegs <= 0) throw new ArgumentOutOfRangeException();
 
                 var dSrc = _functionNode.PushPopStackSize + Cpu.Info.RegisterSize;
                 var dDst = _functionNode.AlignStackSize + _functionNode.CallStackSize + _functionNode.AlignedMemStackSize + _functionNode.MoveStackSize;
 
-                if (_functionNode.IsStackFrameRegPreserved)
-                {
-                    dSrc += Cpu.Info.RegisterSize;
-                }
+                if (_functionNode.IsStackFrameRegPreserved) dSrc += Cpu.Info.RegisterSize;
 
                 var mSrc = Memory.Ptr(fpReg, dSrc);
-                var mDst = Memory.Ptr(_assembler.Zsp, dDst);
+                var mDst = Memory.Ptr(Cpu.Zsp, dDst);
 
                 while (moveIndex < moveCount)
                 {
@@ -773,22 +762,22 @@ namespace AsmJit.CompilerContext
             for (i = 0, mask = regsXmm; mask != 0; i++, mask >>= 1)
             {
                 if (!mask.IsSet(0x1)) continue;
-                _compiler.Emit(InstructionId.Movaps, Compiler.Xmm(i), Memory.OWordPtr(_assembler.Zsp, stackPtr));
+                _compiler.Emit(InstructionId.Movaps, Cpu.Xmm(i), Memory.OWordPtr(Cpu.Zsp, stackPtr));
                 stackPtr += 16;
             }
 
             for (i = 0, mask = regsMm; mask != 0; i++, mask >>= 1)
             {
                 if (!mask.IsSet(0x1)) continue;
-                _compiler.Emit(InstructionId.Movq, Compiler.Mm(i), Memory.QWord(_assembler.Zsp, stackPtr));
+                _compiler.Emit(InstructionId.Movq, Cpu.Mm(i), Memory.QWord(Cpu.Zsp, stackPtr));
                 stackPtr += 8;
             }
 
             // Adjust stack.
-            if (useLeaEpilog) _compiler.Emit(InstructionId.Lea, _assembler.Zsp, Memory.Ptr(fpReg, -_functionNode.PushPopStackSize));
+            if (useLeaEpilog) _compiler.Emit(InstructionId.Lea, Cpu.Zsp, Memory.Ptr(fpReg, -_functionNode.PushPopStackSize));
             else if (!_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsStackMisaligned))
             {
-                if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsStackAdjusted) && stackSize != 0) _compiler.Emit(InstructionId.Add, _assembler.Zsp, (Immediate)stackSize);
+                if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsStackAdjusted) && stackSize != 0) _compiler.Emit(InstructionId.Add, Cpu.Zsp, (Immediate)stackSize);
             }
 
             // Restore Gp (Push/Pop).
@@ -807,7 +796,7 @@ namespace AsmJit.CompilerContext
             {
                 if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsStackMisaligned))
                 {
-                    _compiler.Emit(InstructionId.Mov, _assembler.Zsp, fpOffset);
+                    _compiler.Emit(InstructionId.Mov, Cpu.Zsp, fpOffset);
 
                     if (_functionNode.IsStackFrameRegPreserved) _compiler.Emit(InstructionId.Pop, fpReg);
 
@@ -820,7 +809,7 @@ namespace AsmJit.CompilerContext
                 else if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.X86Leave)) _compiler.Emit(InstructionId.Leave);
                 else
                 {
-                    _compiler.Emit(InstructionId.Mov, _assembler.Zsp, fpReg);
+                    _compiler.Emit(InstructionId.Mov, Cpu.Zsp, fpReg);
                     _compiler.Emit(InstructionId.Pop, fpReg);
                 }
             }
@@ -880,16 +869,16 @@ namespace AsmJit.CompilerContext
             }
         }
 
-        private void LoadState(VariableState src, RegisterClass @class)
+        private void LoadState(VariableState src, RegisterClass rClass)
         {
             var cur = _variableContext.State;
 
-            var cVars = cur.GetListByClass(@class);
-            var sVars = src.GetListByClass(@class);
+            var cVars = cur.GetListByClass(rClass);
+            var sVars = src.GetListByClass(rClass);
 
             int regIndex;
-            var modified = src.Modified.Get(@class);
-            var regCount = Cpu.Info.RegisterCount.Get(@class);
+            var modified = src.Modified.Get(rClass);
+            var regCount = Cpu.Info.RegisterCount.Get(rClass);
 
             for (regIndex = 0; regIndex < regCount; regIndex++, modified >>= 1)
             {
@@ -926,13 +915,13 @@ namespace AsmJit.CompilerContext
             }
         }
 
-        private void SwitchState(VariableState src, RegisterClass @class)
+        private void SwitchState(VariableState src, RegisterClass rClass)
         {
             var dst = _variableContext.State;
-            var dVars = dst.GetListByClass(@class);
-            var sVars = src.GetListByClass(@class);
+            var dVars = dst.GetListByClass(rClass);
+            var sVars = src.GetListByClass(rClass);
             var cells = src.Cells;
-            var regCount = Cpu.Info.RegisterCount.Get(@class);
+            var regCount = Cpu.Info.RegisterCount.Get(rClass);
 
             bool didWork;
             do
@@ -951,8 +940,8 @@ namespace AsmJit.CompilerContext
 
                         if (cell.Value0 != VariableUsage.Reg)
                         {
-                            if (cell.Value0 == VariableUsage.Mem) Spill(dVd, @class);
-                            else Unuse(dVd, @class);
+                            if (cell.Value0 == VariableUsage.Mem) Spill(dVd, rClass);
+                            else Unuse(dVd, rClass);
 
                             dVd = null;
                             didWork = true;
@@ -963,7 +952,7 @@ namespace AsmJit.CompilerContext
 
                     if (dVd == null && sVd != null)
                     {
-                        didWork = MoveOrLoad(sVd, @class, regIndex);
+                        didWork = MoveOrLoad(sVd, rClass, regIndex);
                         continue;
                     }
 
@@ -977,10 +966,10 @@ namespace AsmJit.CompilerContext
                                 case VariableUsage.Reg:
                                     continue;
                                 case VariableUsage.Mem:
-                                    Spill(dVd, @class);
+                                    Spill(dVd, rClass);
                                     break;
                                 default:
-                                    Unuse(dVd, @class);
+                                    Unuse(dVd, rClass);
                                     break;
                             }
 
@@ -993,11 +982,11 @@ namespace AsmJit.CompilerContext
                                 case VariableUsage.Reg:
                                     if (dVd.RegisterIndex != RegisterIndex.Invalid && sVd.RegisterIndex != RegisterIndex.Invalid)
                                     {
-                                        if (@class == RegisterClass.Gp) SwapGp(dVd, sVd);
+                                        if (rClass == RegisterClass.Gp) SwapGp(dVd, sVd);
                                         else
                                         {
-                                            Spill(dVd, @class);
-                                            Move(sVd, @class, regIndex);
+                                            Spill(dVd, rClass);
+                                            Move(sVd, rClass, regIndex);
                                         }
 
                                         didWork = true;
@@ -1006,21 +995,21 @@ namespace AsmJit.CompilerContext
                                     didWork = true;
                                     continue;
                                 case VariableUsage.Mem:
-                                    Spill(dVd, @class);
+                                    Spill(dVd, rClass);
                                     break;
                                 default:
-                                    Unuse(dVd, @class);
+                                    Unuse(dVd, rClass);
                                     break;
                             }
 
-                            didWork = MoveOrLoad(sVd, @class, regIndex);
+                            didWork = MoveOrLoad(sVd, rClass, regIndex);
                         }
                     }
                 }
             } while (didWork);
 
-            var dModified = dst.Modified.Get(@class);
-            var sModified = src.Modified.Get(@class);
+            var dModified = dst.Modified.Get(rClass);
+            var sModified = src.Modified.Get(rClass);
 
             if (dModified == sModified) return;
             {
@@ -1032,11 +1021,11 @@ namespace AsmJit.CompilerContext
 
                     if (dModified.IsSet(regMask) && !sModified.IsSet(regMask))
                     {
-                        Save(vd, @class);
+                        Save(vd, rClass);
                         continue;
                     }
 
-                    if (!dModified.IsSet(regMask) && sModified.IsSet(regMask)) Modify(vd, @class);
+                    if (!dModified.IsSet(regMask) && sModified.IsSet(regMask)) Modify(vd, rClass);
                 }
             }
         }
@@ -1050,18 +1039,18 @@ namespace AsmJit.CompilerContext
             IntersectStates(a, b, RegisterClass.Xyz);
         }
 
-        private void IntersectStates(VariableState a, VariableState b, RegisterClass @class)
+        private void IntersectStates(VariableState a, VariableState b, RegisterClass rClass)
         {
             var dst = _variableContext.State;
 
-            var dVars = dst.GetListByClass(@class);
-            var aVars = a.GetListByClass(@class);
-            //var bVars = b.GetListByClass(@class);
+            var dVars = dst.GetListByClass(rClass);
+            var aVars = a.GetListByClass(rClass);
+            //var bVars = b.GetListByClass(rClass);
 
             var aCells = a.Cells;
             var bCells = b.Cells;
 
-            var regCount = Cpu.Info.RegisterCount.Get(@class);
+            var regCount = Cpu.Info.RegisterCount.Get(rClass);
             bool didWork;
 
             do
@@ -1084,8 +1073,8 @@ namespace AsmJit.CompilerContext
 
                         if (aCell.Value0 != VariableUsage.Reg && bCell.Value0 != VariableUsage.Reg)
                         {
-                            if (aCell.Value0 == VariableUsage.Mem || bCell.Value0 == VariableUsage.Mem) Spill(dVd, @class);
-                            else Unuse(dVd, @class);
+                            if (aCell.Value0 == VariableUsage.Mem || bCell.Value0 == VariableUsage.Mem) Spill(dVd, rClass);
+                            else Unuse(dVd, rClass);
 
                             dVd = null;
                             didWork = true;
@@ -1096,8 +1085,8 @@ namespace AsmJit.CompilerContext
 
                     if (dVd == null && aVd != null)
                     {
-                        if (aVd.RegisterIndex != RegisterIndex.Invalid) Move(aVd, @class, regIndex);
-                        else Load(aVd, @class, regIndex);
+                        if (aVd.RegisterIndex != RegisterIndex.Invalid) Move(aVd, rClass, regIndex);
+                        else Load(aVd, rClass, regIndex);
 
                         didWork = true;
                         continue;
@@ -1112,13 +1101,13 @@ namespace AsmJit.CompilerContext
                         {
                             if (aCell.Value0 == VariableUsage.Reg || bCell.Value0 == VariableUsage.Reg) continue;
 
-                            if (aCell.Value0 == VariableUsage.Mem || bCell.Value0 == VariableUsage.Mem) Spill(dVd, @class);
-                            else Unuse(dVd, @class);
+                            if (aCell.Value0 == VariableUsage.Mem || bCell.Value0 == VariableUsage.Mem) Spill(dVd, rClass);
+                            else Unuse(dVd, rClass);
 
                             didWork = true;
                             continue;
                         }
-                        if (@class != RegisterClass.Gp) continue;
+                        if (rClass != RegisterClass.Gp) continue;
                         if (aCell.Value0 != VariableUsage.Reg) continue;
                         if (dVd.RegisterIndex == RegisterIndex.Invalid || aVd.RegisterIndex == RegisterIndex.Invalid) continue;
                         SwapGp(dVd, aVd);
@@ -1128,8 +1117,8 @@ namespace AsmJit.CompilerContext
                 }
             } while (didWork);
 
-            var dModified = dst.Modified.Get(@class);
-            var aModified = a.Modified.Get(@class);
+            var dModified = dst.Modified.Get(rClass);
+            var aModified = a.Modified.Get(rClass);
 
             if (dModified == aModified) return;
             {
@@ -1140,7 +1129,7 @@ namespace AsmJit.CompilerContext
                     if (vd == null) continue;
 
                     var aCell = aCells[vd.LocalId];
-                    if (dModified.IsSet(regMask) && !aModified.IsSet(regMask) && aCell.Value0 == VariableUsage.Reg) Save(vd, @class);
+                    if (dModified.IsSet(regMask) && !aModified.IsSet(regMask) && aCell.Value0 == VariableUsage.Reg) Save(vd, rClass);
                 }
             }
         }
@@ -1177,10 +1166,10 @@ namespace AsmJit.CompilerContext
             LoadState(jNode.VariableState);
         }
 
-        private bool MoveOrLoad(VariableData vd, RegisterClass @class, int regIndex)
+        private bool MoveOrLoad(VariableData vd, RegisterClass rClass, int regIndex)
         {
-            if (vd.RegisterIndex != RegisterIndex.Invalid) Move(vd, @class, regIndex);
-            else Load(vd, @class, regIndex);
+            if (vd.RegisterIndex != RegisterIndex.Invalid) Move(vd, rClass, regIndex);
+            else Load(vd, rClass, regIndex);
 
             return true;
         }
@@ -1206,85 +1195,73 @@ namespace AsmJit.CompilerContext
             _variableContext.State.Modified.Xor(RegisterClass.Gp, (m << aIndex) | (m << bIndex));
         }
 
-        internal void Spill(VariableData vd, RegisterClass @class)
+        internal void Spill(VariableData vd, RegisterClass rClass)
         {
-            if (vd.Info.RegisterClass != @class) throw new ArgumentException();
+            if (vd.Info.RegisterClass != rClass) throw new ArgumentException();
 
             if (vd.State != VariableUsage.Reg) return;
             var regIndex = vd.RegisterIndex;
-            if (regIndex == RegisterIndex.Invalid || _variableContext.State.GetListByClass(@class)[regIndex] != vd) throw new ArgumentException();
+            if (regIndex == RegisterIndex.Invalid || _variableContext.State.GetListByClass(rClass)[regIndex] != vd) throw new ArgumentException();
             if (vd.IsModified)
             {
                 EmitSave(vd, regIndex);
             }
-            Detach(vd, @class, regIndex, VariableUsage.Mem);
+            Detach(vd, rClass, regIndex, VariableUsage.Mem);
         }
 
-        internal void Unuse(VariableData vd, RegisterClass @class, VariableUsage vState = VariableUsage.None)
+        internal void Unuse(VariableData vd, RegisterClass rClass, VariableUsage vState = VariableUsage.None)
         {
-            if (vd.Info.RegisterClass != @class || vState == VariableUsage.Reg) throw new ArgumentException();
+            if (vd.Info.RegisterClass != rClass || vState == VariableUsage.Reg) throw new ArgumentException();
 
             var regIndex = vd.RegisterIndex;
-            if (regIndex != RegisterIndex.Invalid)
-            {
-                Detach(vd, @class, regIndex, vState);
-            }
-            else
-            {
-                vd.State = vState;
-            }
+            if (regIndex != RegisterIndex.Invalid) Detach(vd, rClass, regIndex, vState);
+            else vd.State = vState;
         }
 
-        internal void Alloc(VariableData vd, RegisterClass @class, int regIndex)
+        internal void Alloc(VariableData vd, RegisterClass rClass, int regIndex)
         {
-            if (vd.Info.RegisterClass != @class || regIndex == RegisterIndex.Invalid) throw new ArgumentException();
+            if (vd.Info.RegisterClass != rClass || regIndex == RegisterIndex.Invalid) throw new ArgumentException();
 
             var oldRegIndex = vd.RegisterIndex;
             var oldState = vd.State;
             var regMask = Utils.Mask(regIndex);
 
-            if (_variableContext.State.GetListByClass(@class)[regIndex] != null && regIndex != oldRegIndex) throw new ArgumentException();
+            if (_variableContext.State.GetListByClass(rClass)[regIndex] != null && regIndex != oldRegIndex) throw new ArgumentException();
 
             if (oldState != VariableUsage.Reg)
             {
-                if (oldState == VariableUsage.Mem)
-                {
-                    EmitLoad(vd, regIndex);
-                }
+                if (oldState == VariableUsage.Mem) EmitLoad(vd, regIndex);
                 vd.IsModified = false;
             }
             else if (oldRegIndex != regIndex)
             {
                 EmitMove(vd, regIndex, oldRegIndex);
 
-                _variableContext.State.GetListByClass(@class)[oldRegIndex] = null;
+                _variableContext.State.GetListByClass(rClass)[oldRegIndex] = null;
                 regMask ^= Utils.Mask(oldRegIndex);
             }
-            else
-            {
-                return;
-            }
+            else return;
 
             vd.State = VariableUsage.Reg;
             vd.RegisterIndex = regIndex;
             vd.HomeMask |= Utils.Mask(regIndex);
 
-            _variableContext.State.GetListByClass(@class)[regIndex] = vd;
-            _variableContext.State.Occupied.Xor(@class, regMask);
-            _variableContext.State.Modified.Xor(@class, regMask & -vd.IsModified.AsInt());
+            _variableContext.State.GetListByClass(rClass)[regIndex] = vd;
+            _variableContext.State.Occupied.Xor(rClass, regMask);
+            _variableContext.State.Modified.Xor(rClass, regMask & -vd.IsModified.AsInt());
         }
 
-        private void Load(VariableData vd, RegisterClass @class, int regIndex)
+        private void Load(VariableData vd, RegisterClass rClass, int regIndex)
         {
-            if (vd.Info.RegisterClass != @class || vd.State == VariableUsage.Reg || vd.RegisterIndex != RegisterIndex.Invalid) throw new ArgumentException();
+            if (vd.Info.RegisterClass != rClass || vd.State == VariableUsage.Reg || vd.RegisterIndex != RegisterIndex.Invalid) throw new ArgumentException();
 
             EmitLoad(vd, regIndex);
-            Attach(vd, @class, regIndex, false);
+            Attach(vd, rClass, regIndex, false);
         }
 
-        internal void Save(VariableData vd, RegisterClass @class)
+        internal void Save(VariableData vd, RegisterClass rClass)
         {
-            if (vd.Info.RegisterClass != @class || vd.State != VariableUsage.Reg || vd.RegisterIndex == RegisterIndex.Invalid) throw new ArgumentException();
+            if (vd.Info.RegisterClass != rClass || vd.State != VariableUsage.Reg || vd.RegisterIndex == RegisterIndex.Invalid) throw new ArgumentException();
 
             var regIndex = vd.RegisterIndex;
             var regMask = Utils.Mask(regIndex);
@@ -1292,33 +1269,33 @@ namespace AsmJit.CompilerContext
             EmitSave(vd, regIndex);
 
             vd.IsModified = false;
-            _variableContext.State.Modified.AndNot(@class, regMask);
+            _variableContext.State.Modified.AndNot(rClass, regMask);
         }
 
-        private void Modify(VariableData vd, RegisterClass @class)
+        private void Modify(VariableData vd, RegisterClass rClass)
         {
-            if (vd.Info.RegisterClass != @class) throw new ArgumentException();
+            if (vd.Info.RegisterClass != rClass) throw new ArgumentException();
 
             var regIndex = vd.RegisterIndex;
             var regMask = Utils.Mask(regIndex);
 
             vd.IsModified = true;
-            _variableContext.State.Modified.Or(@class, regMask);
+            _variableContext.State.Modified.Or(rClass, regMask);
         }
 
-        internal void Move(VariableData vd, RegisterClass @class, int regIndex)
+        internal void Move(VariableData vd, RegisterClass rClass, int regIndex)
         {
-            if (vd.Info.RegisterClass != @class || vd.State != VariableUsage.Reg || vd.RegisterIndex == RegisterIndex.Invalid) throw new ArgumentException();
+            if (vd.Info.RegisterClass != rClass || vd.State != VariableUsage.Reg || vd.RegisterIndex == RegisterIndex.Invalid) throw new ArgumentException();
 
             var oldIndex = vd.RegisterIndex;
             if (regIndex == oldIndex) return;
             EmitMove(vd, regIndex, oldIndex);
-            Rebase(vd, @class, regIndex, oldIndex);
+            Rebase(vd, rClass, regIndex, oldIndex);
         }
 
-        private void Rebase(VariableData vd, RegisterClass @class, int newRegIndex, int oldRegIndex)
+        private void Rebase(VariableData vd, RegisterClass rClass, int newRegIndex, int oldRegIndex)
         {
-            if (vd.Info.RegisterClass != @class) throw new ArgumentException();
+            if (vd.Info.RegisterClass != rClass) throw new ArgumentException();
 
             var newRegMask = Utils.Mask(newRegIndex);
             var oldRegMask = Utils.Mask(oldRegIndex);
@@ -1326,16 +1303,16 @@ namespace AsmJit.CompilerContext
 
             vd.RegisterIndex = newRegIndex;
 
-            _variableContext.State.GetListByClass(@class)[oldRegIndex] = null;
-            _variableContext.State.GetListByClass(@class)[newRegIndex] = vd;
+            _variableContext.State.GetListByClass(rClass)[oldRegIndex] = null;
+            _variableContext.State.GetListByClass(rClass)[newRegIndex] = vd;
 
-            _variableContext.State.Occupied.Xor(@class, bothRegMask);
-            _variableContext.State.Modified.Xor(@class, bothRegMask & -vd.IsModified.AsInt());
+            _variableContext.State.Occupied.Xor(rClass, bothRegMask);
+            _variableContext.State.Modified.Xor(rClass, bothRegMask & -vd.IsModified.AsInt());
         }
 
-        internal void Attach(VariableData vd, RegisterClass @class, int regIndex, bool modified)
+        internal void Attach(VariableData vd, RegisterClass rClass, int regIndex, bool modified)
         {
-            if (vd.Info.RegisterClass != @class || regIndex == RegisterIndex.Invalid || (regIndex == RegisterIndex.Sp && @class == RegisterClass.Gp)) throw new ArgumentException();
+            if (vd.Info.RegisterClass != rClass || regIndex == RegisterIndex.Invalid || (regIndex == RegisterIndex.Sp && rClass == RegisterClass.Gp)) throw new ArgumentException();
 
             var regMask = Utils.Mask(regIndex);
 
@@ -1344,14 +1321,14 @@ namespace AsmJit.CompilerContext
             vd.HomeMask |= Utils.Mask(regIndex);
             vd.IsModified = modified;
 
-            _variableContext.State.GetListByClass(@class)[regIndex] = vd;
-            _variableContext.State.Occupied.Or(@class, regMask);
-            _variableContext.State.Modified.Or(@class, modified.AsInt() << regIndex);
+            _variableContext.State.GetListByClass(rClass)[regIndex] = vd;
+            _variableContext.State.Occupied.Or(rClass, regMask);
+            _variableContext.State.Modified.Or(rClass, modified.AsInt() << regIndex);
         }
 
-        private void Detach(VariableData vd, RegisterClass @class, int regIndex, VariableUsage vState)
+        private void Detach(VariableData vd, RegisterClass rClass, int regIndex, VariableUsage vState)
         {
-            if (vd.Info.RegisterClass != @class || vd.RegisterIndex != regIndex || vState == VariableUsage.Reg) throw new ArgumentException();
+            if (vd.Info.RegisterClass != rClass || vd.RegisterIndex != regIndex || vState == VariableUsage.Reg) throw new ArgumentException();
 
             var regMask = Utils.Mask(regIndex);
 
@@ -1359,9 +1336,9 @@ namespace AsmJit.CompilerContext
             vd.RegisterIndex = RegisterIndex.Invalid;
             vd.IsModified = false;
 
-            _variableContext.State.GetListByClass(@class)[regIndex] = null;
-            _variableContext.State.Occupied.AndNot(@class, regMask);
-            _variableContext.State.Modified.AndNot(@class, regMask);
+            _variableContext.State.GetListByClass(rClass)[regIndex] = null;
+            _variableContext.State.Occupied.AndNot(rClass, regMask);
+            _variableContext.State.Modified.AndNot(rClass, regMask);
         }
 
         private void EmitSwapGp(VariableData aVd, VariableData bVd, int aIndex, int bIndex)
@@ -1371,19 +1348,10 @@ namespace AsmJit.CompilerContext
             if (Constants.X64)
             {
                 var vType = (VariableType)Math.Max((int)aVd.Type, (int)bVd.Type);
-                if (vType == VariableType.Int64 || vType == VariableType.UInt64)
-                {
-                    _compiler.Emit(InstructionId.Xchg, Compiler.Gpq(aIndex), Compiler.Gpq(bIndex));
-                }
-                else
-                {
-                    _compiler.Emit(InstructionId.Xchg, Compiler.Gpd(aIndex), Compiler.Gpd(bIndex));
-                }
+                if (vType == VariableType.Int64 || vType == VariableType.UInt64) _compiler.Emit(InstructionId.Xchg, Cpu.Gpq(aIndex), Cpu.Gpq(bIndex));
+                else _compiler.Emit(InstructionId.Xchg, Cpu.Gpd(aIndex), Cpu.Gpd(bIndex));
             }
-            else
-            {
-                _assembler.Emit(InstructionId.Xchg, Compiler.Gpd(aIndex), Compiler.Gpd(bIndex));
-            }
+            else _assemblerBase.Emit(InstructionId.Xchg, Cpu.Gpd(aIndex), Cpu.Gpd(bIndex));
         }
 
         private void EmitSave(VariableData vd, int regIndex)
@@ -1395,38 +1363,38 @@ namespace AsmJit.CompilerContext
                     break;
                 case VariableType.Int8:
                 case VariableType.UInt8:
-                    _compiler.Emit(InstructionId.Mov, m, Compiler.GpbLo(regIndex));
+                    _compiler.Emit(InstructionId.Mov, m, Cpu.GpbLo(regIndex));
                     break;
                 case VariableType.Int16:
                 case VariableType.UInt16:
-                    _compiler.Emit(InstructionId.Mov, m, Compiler.Gpw(regIndex));
+                    _compiler.Emit(InstructionId.Mov, m, Cpu.Gpw(regIndex));
                     break;
                 case VariableType.Int32:
                 case VariableType.UInt32:
-                    _compiler.Emit(InstructionId.Mov, m, Compiler.Gpd(regIndex));
+                    _compiler.Emit(InstructionId.Mov, m, Cpu.Gpd(regIndex));
                     break;
                 case VariableType.Int64:
                 case VariableType.UInt64:
-                    if (Constants.X64) _compiler.Emit(InstructionId.Mov, m, Compiler.Gpq(regIndex));
+                    if (Constants.X64) _compiler.Emit(InstructionId.Mov, m, Cpu.Gpq(regIndex));
                     else throw new InvalidEnumArgumentException();
                     break;
                 case VariableType.Mm:
-                    _compiler.Emit(InstructionId.Movq, m, Compiler.Mm(regIndex));
+                    _compiler.Emit(InstructionId.Movq, m, Cpu.Mm(regIndex));
                     break;
                 case VariableType.Xmm:
-                    _compiler.Emit(InstructionId.Movdqa, m, Compiler.Xmm(regIndex));
+                    _compiler.Emit(InstructionId.Movdqa, m, Cpu.Xmm(regIndex));
                     break;
                 case VariableType.XmmSs:
-                    _compiler.Emit(InstructionId.Movss, m, Compiler.Xmm(regIndex));
+                    _compiler.Emit(InstructionId.Movss, m, Cpu.Xmm(regIndex));
                     break;
                 case VariableType.XmmPs:
-                    _compiler.Emit(InstructionId.Movaps, m, Compiler.Xmm(regIndex));
+                    _compiler.Emit(InstructionId.Movaps, m, Cpu.Xmm(regIndex));
                     break;
                 case VariableType.XmmSd:
-                    _compiler.Emit(InstructionId.Movsd, m, Compiler.Xmm(regIndex));
+                    _compiler.Emit(InstructionId.Movsd, m, Cpu.Xmm(regIndex));
                     break;
                 case VariableType.XmmPd:
-                    _compiler.Emit(InstructionId.Movapd, m, Compiler.Xmm(regIndex));
+                    _compiler.Emit(InstructionId.Movapd, m, Cpu.Xmm(regIndex));
                     break;
                 default:
                     throw new InvalidEnumArgumentException();
@@ -1442,38 +1410,38 @@ namespace AsmJit.CompilerContext
                     break;
                 case VariableType.Int8:
                 case VariableType.UInt8:
-                    _compiler.Emit(InstructionId.Mov, Compiler.GpbLo(regIndex), m);
+                    _compiler.Emit(InstructionId.Mov, Cpu.GpbLo(regIndex), m);
                     break;
                 case VariableType.Int16:
                 case VariableType.UInt16:
-                    _compiler.Emit(InstructionId.Mov, Compiler.Gpw(regIndex), m);
+                    _compiler.Emit(InstructionId.Mov, Cpu.Gpw(regIndex), m);
                     break;
                 case VariableType.Int32:
                 case VariableType.UInt32:
-                    _compiler.Emit(InstructionId.Mov, Compiler.Gpd(regIndex), m);
+                    _compiler.Emit(InstructionId.Mov, Cpu.Gpd(regIndex), m);
                     break;
                 case VariableType.Int64:
                 case VariableType.UInt64:
-                    if (Constants.X64) _compiler.Emit(InstructionId.Mov, Compiler.Gpq(regIndex), m);
+                    if (Constants.X64) _compiler.Emit(InstructionId.Mov, Cpu.Gpq(regIndex), m);
                     else throw new InvalidEnumArgumentException();
                     break;
                 case VariableType.Mm:
-                    _compiler.Emit(InstructionId.Movq, Compiler.Mm(regIndex), m);
+                    _compiler.Emit(InstructionId.Movq, Cpu.Mm(regIndex), m);
                     break;
                 case VariableType.Xmm:
-                    _compiler.Emit(InstructionId.Movdqa, Compiler.Xmm(regIndex), m);
+                    _compiler.Emit(InstructionId.Movdqa, Cpu.Xmm(regIndex), m);
                     break;
                 case VariableType.XmmSs:
-                    _compiler.Emit(InstructionId.Movss, Compiler.Xmm(regIndex), m);
+                    _compiler.Emit(InstructionId.Movss, Cpu.Xmm(regIndex), m);
                     break;
                 case VariableType.XmmPs:
-                    _compiler.Emit(InstructionId.Movaps, Compiler.Xmm(regIndex), m);
+                    _compiler.Emit(InstructionId.Movaps, Cpu.Xmm(regIndex), m);
                     break;
                 case VariableType.XmmSd:
-                    _compiler.Emit(InstructionId.Movsd, Compiler.Xmm(regIndex), m);
+                    _compiler.Emit(InstructionId.Movsd, Cpu.Xmm(regIndex), m);
                     break;
                 case VariableType.XmmPd:
-                    _compiler.Emit(InstructionId.Movapd, Compiler.Xmm(regIndex), m);
+                    _compiler.Emit(InstructionId.Movapd, Cpu.Xmm(regIndex), m);
                     break;
                 default:
                     throw new InvalidEnumArgumentException();
@@ -1494,30 +1462,30 @@ namespace AsmJit.CompilerContext
                 case VariableType.UInt16:
                 case VariableType.Int32:
                 case VariableType.UInt32:
-                    _compiler.Emit(InstructionId.Mov, Compiler.Gpd(toRegIndex), Compiler.Gpd(fromRegIndex));
+                    _compiler.Emit(InstructionId.Mov, Cpu.Gpd(toRegIndex), Cpu.Gpd(fromRegIndex));
                     break;
                 case VariableType.Int64:
                 case VariableType.UInt64:
-                    if (Constants.X64) _compiler.Emit(InstructionId.Mov, Compiler.Gpq(toRegIndex), Compiler.Gpq(fromRegIndex));
+                    if (Constants.X64) _compiler.Emit(InstructionId.Mov, Cpu.Gpq(toRegIndex), Cpu.Gpq(fromRegIndex));
                     else throw new InvalidEnumArgumentException();
                     break;
                 case VariableType.Mm:
-                    _compiler.Emit(InstructionId.Movq, Compiler.Mm(toRegIndex), Compiler.Mm(fromRegIndex));
+                    _compiler.Emit(InstructionId.Movq, Cpu.Mm(toRegIndex), Cpu.Mm(fromRegIndex));
                     break;
                 case VariableType.Xmm:
-                    _compiler.Emit(InstructionId.Movdqa, Compiler.Xmm(toRegIndex), Compiler.Xmm(fromRegIndex));
+                    _compiler.Emit(InstructionId.Movdqa, Cpu.Xmm(toRegIndex), Cpu.Xmm(fromRegIndex));
                     break;
                 case VariableType.XmmSs:
-                    _compiler.Emit(InstructionId.Movss, Compiler.Xmm(toRegIndex), Compiler.Xmm(fromRegIndex));
+                    _compiler.Emit(InstructionId.Movss, Cpu.Xmm(toRegIndex), Cpu.Xmm(fromRegIndex));
                     break;
                 case VariableType.XmmPs:
-                    _compiler.Emit(InstructionId.Movaps, Compiler.Xmm(toRegIndex), Compiler.Xmm(fromRegIndex));
+                    _compiler.Emit(InstructionId.Movaps, Cpu.Xmm(toRegIndex), Cpu.Xmm(fromRegIndex));
                     break;
                 case VariableType.XmmSd:
-                    _compiler.Emit(InstructionId.Movsd, Compiler.Xmm(toRegIndex), Compiler.Xmm(fromRegIndex));
+                    _compiler.Emit(InstructionId.Movsd, Cpu.Xmm(toRegIndex), Cpu.Xmm(fromRegIndex));
                     break;
                 case VariableType.XmmPd:
-                    _compiler.Emit(InstructionId.Movapd, Compiler.Xmm(toRegIndex), Compiler.Xmm(fromRegIndex));
+                    _compiler.Emit(InstructionId.Movapd, Cpu.Xmm(toRegIndex), Cpu.Xmm(fromRegIndex));
                     break;
                 default:
                     throw new InvalidEnumArgumentException();
@@ -1632,19 +1600,19 @@ namespace AsmJit.CompilerContext
                 case VariableType.Int8:
                 case VariableType.UInt8:
                     imm.TruncateTo8Bits();
-                    r0 = Compiler.Gpd(dstIndex);
+                    r0 = Cpu.Gpd(dstIndex);
                     _compiler.Emit(InstructionId.Mov, r0, imm);
                     break;
                 case VariableType.Int16:
                 case VariableType.UInt16:
                     imm.TruncateTo16Bits();
-                    r0 = Compiler.Gpd(dstIndex);
+                    r0 = Cpu.Gpd(dstIndex);
                     _compiler.Emit(InstructionId.Mov, r0, imm);
                     break;
                 case VariableType.Int32:
                 case VariableType.UInt32:
                     imm.TruncateTo32Bits();
-                    r0 = Compiler.Gpd(dstIndex);
+                    r0 = Cpu.Gpd(dstIndex);
                     _compiler.Emit(InstructionId.Mov, r0, imm);
                     break;
                 case VariableType.Int64:
@@ -1654,12 +1622,12 @@ namespace AsmJit.CompilerContext
                     if (imm.IsUInt32())
                     {
                         imm.TruncateTo32Bits();
-                        r0 = Compiler.Gpd(dstIndex);
+                        r0 = Cpu.Gpd(dstIndex);
                         _compiler.Emit(InstructionId.Mov, r0, imm);
                     }
                     else
                     {
-                        r0 = Compiler.Gpq(dstIndex);
+                        r0 = Cpu.Gpq(dstIndex);
                         _compiler.Emit(InstructionId.Mov, r0, imm);
                     }
                     break;
@@ -1688,7 +1656,7 @@ namespace AsmJit.CompilerContext
                     case VariableType.XmmSs:
                         if (srcType == VariableType.XmmSd || srcType == VariableType.XmmPd || srcType == VariableType.YmmPd)
                         {
-                            _compiler.Emit(InstructionId.Cvtsd2ss, Compiler.Xmm(dstIndex), Compiler.Xmm(srcIndex));
+                            _compiler.Emit(InstructionId.Cvtsd2ss, Cpu.Xmm(dstIndex), Cpu.Xmm(srcIndex));
                             return;
                         }
                         if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt64)
@@ -1700,7 +1668,7 @@ namespace AsmJit.CompilerContext
                     case VariableType.XmmPs:
                         if (srcType == VariableType.XmmPd || srcType == VariableType.YmmPd)
                         {
-                            _compiler.Emit(InstructionId.Cvtpd2ps, Compiler.Xmm(dstIndex), Compiler.Xmm(srcIndex));
+                            _compiler.Emit(InstructionId.Cvtpd2ps, Cpu.Xmm(dstIndex), Cpu.Xmm(srcIndex));
                             return;
                         }
                         type = VariableType.XmmPd;
@@ -1708,7 +1676,7 @@ namespace AsmJit.CompilerContext
                     case VariableType.XmmSd:
                         if (srcType == VariableType.XmmSs || srcType == VariableType.XmmPs || srcType == VariableType.YmmPs)
                         {
-                            _compiler.Emit(InstructionId.Cvtss2sd, Compiler.Xmm(dstIndex), Compiler.Xmm(srcIndex));
+                            _compiler.Emit(InstructionId.Cvtss2sd, Cpu.Xmm(dstIndex), Cpu.Xmm(srcIndex));
                             return;
                         }
                         if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt64)
@@ -1720,7 +1688,7 @@ namespace AsmJit.CompilerContext
                     case VariableType.XmmPd:
                         if (srcType == VariableType.XmmPs || srcType == VariableType.YmmPs)
                         {
-                            _compiler.Emit(InstructionId.Cvtps2pd, Compiler.Xmm(dstIndex), Compiler.Xmm(srcIndex));
+                            _compiler.Emit(InstructionId.Cvtps2pd, Cpu.Xmm(dstIndex), Cpu.Xmm(srcIndex));
                             return;
                         }
                         type = VariableType.XmmSd;
@@ -1736,43 +1704,43 @@ namespace AsmJit.CompilerContext
             var movGpD = new Action(() =>
             {
                 var m0 = new Memory(dst, 4);
-                var r0 = Compiler.Gpd(srcIndex);
+                var r0 = Cpu.Gpd(srcIndex);
                 _compiler.Emit(InstructionId.Mov, m0, r0);
             });
             var movGpQ = new Action(() =>
             {
                 var m0 = new Memory(dst, 8);
-                var r0 = Compiler.Gpq(srcIndex);
+                var r0 = Cpu.Gpq(srcIndex);
                 _compiler.Emit(InstructionId.Mov, m0, r0);
             });
             var movMmD = new Action(() =>
             {
                 var m0 = new Memory(dst, 4);
-                var r0 = Compiler.Mm(srcIndex);
+                var r0 = Cpu.Mm(srcIndex);
                 _compiler.Emit(InstructionId.Movd, m0, r0);
             });
             var movMmQ = new Action(() =>
             {
                 var m0 = new Memory(dst, 8);
-                var r0 = Compiler.Mm(srcIndex);
+                var r0 = Cpu.Mm(srcIndex);
                 _compiler.Emit(InstructionId.Movd, m0, r0);
             });
             var movXmmD = new Action(() =>
             {
                 var m0 = new Memory(dst, 4);
-                var r0 = Compiler.Xmm(srcIndex);
+                var r0 = Cpu.Xmm(srcIndex);
                 _compiler.Emit(InstructionId.Movss, m0, r0);
             });
             var movXmmQ = new Action(() =>
             {
                 var m0 = new Memory(dst, 8);
-                var r0 = Compiler.Xmm(srcIndex);
+                var r0 = Cpu.Xmm(srcIndex);
                 _compiler.Emit(InstructionId.Movlps, m0, r0);
             });
             var extendMovGpD = new Action<Register, InstructionId>((r1, instId) =>
             {
                 var m0 = new Memory(dst, 4);
-                var r0 = Compiler.Gpd(srcIndex);
+                var r0 = Cpu.Gpd(srcIndex);
                 _compiler.Emit(instId, r0, r1);
                 _compiler.Emit(InstructionId.Mov, m0, r0);
             });
@@ -1787,14 +1755,14 @@ namespace AsmJit.CompilerContext
                 if (Constants.X64)
                 {
                     var m0 = new Memory(dst, 8);
-                    var r0 = Compiler.Gpq(srcIndex);
+                    var r0 = Cpu.Gpq(srcIndex);
                     _compiler.Emit(instId, r0, r1);
                     _compiler.Emit(InstructionId.Mov, m0, r0);
                 }
                 else
                 {
                     var m0 = new Memory(dst, 4);
-                    var r0 = Compiler.Gpd(srcIndex);
+                    var r0 = Cpu.Gpd(srcIndex);
                     _compiler.Emit(instId, r0, r1);
                     extendMovGpDq(m0, r0);
                 }
@@ -1815,16 +1783,13 @@ namespace AsmJit.CompilerContext
                         movMmD();
                         return;
                     }
-                    if (srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd)
-                    {
-                        movXmmD();
-                    }
+                    if (srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd) movXmmD();
                     break;
                 case VariableType.Int16:
                 case VariableType.UInt16:
                     if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt8)
                     {
-                        extendMovGpD(Compiler.GpbLo(srcIndex), dstType == VariableType.Int16 && srcType == VariableType.Int8 ? InstructionId.Movsx : InstructionId.Movzx);
+                        extendMovGpD(Cpu.GpbLo(srcIndex), dstType == VariableType.Int16 && srcType == VariableType.Int8 ? InstructionId.Movsx : InstructionId.Movzx);
                         return;
                     }
                     if (srcType >= VariableType.Int16 && srcType <= VariableType.UInt64)
@@ -1837,21 +1802,18 @@ namespace AsmJit.CompilerContext
                         movMmD();
                         return;
                     }
-                    if (srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd)
-                    {
-                        movXmmD();
-                    }
+                    if (srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd) movXmmD();
                     break;
                 case VariableType.Int32:
                 case VariableType.UInt32:
                     if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt8)
                     {
-                        extendMovGpD(Compiler.GpbLo(srcIndex), dstType == VariableType.Int32 && srcType == VariableType.Int8 ? InstructionId.Movsx : InstructionId.Movzx);
+                        extendMovGpD(Cpu.GpbLo(srcIndex), dstType == VariableType.Int32 && srcType == VariableType.Int8 ? InstructionId.Movsx : InstructionId.Movzx);
                         return;
                     }
                     if (srcType >= VariableType.Int16 && srcType <= VariableType.UInt16)
                     {
-                        extendMovGpD(Compiler.Gpw(srcIndex), dstType == VariableType.Int32 && srcType == VariableType.Int16 ? InstructionId.Movsx : InstructionId.Movzx);
+                        extendMovGpD(Cpu.Gpw(srcIndex), dstType == VariableType.Int32 && srcType == VariableType.Int16 ? InstructionId.Movsx : InstructionId.Movzx);
                         return;
                     }
                     if (srcType >= VariableType.Int32 && srcType <= VariableType.UInt64)
@@ -1864,32 +1826,29 @@ namespace AsmJit.CompilerContext
                         movMmD();
                         return;
                     }
-                    if (srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd)
-                    {
-                        movXmmD();
-                    }
+                    if (srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd) movXmmD();
                     break;
                 case VariableType.Int64:
                 case VariableType.UInt64:
                     if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt8)
                     {
-                        extendMovGpXq(Compiler.GpbLo(srcIndex), dstType == VariableType.Int64 && srcType == VariableType.Int8 ? InstructionId.Movsx : InstructionId.Movzx);
+                        extendMovGpXq(Cpu.GpbLo(srcIndex), dstType == VariableType.Int64 && srcType == VariableType.Int8 ? InstructionId.Movsx : InstructionId.Movzx);
                         return;
                     }
                     if (srcType >= VariableType.Int16 && srcType <= VariableType.UInt16)
                     {
-                        extendMovGpXq(Compiler.Gpw(srcIndex), dstType == VariableType.Int32 && srcType == VariableType.Int16 ? InstructionId.Movsx : InstructionId.Movzx);
+                        extendMovGpXq(Cpu.Gpw(srcIndex), dstType == VariableType.Int32 && srcType == VariableType.Int16 ? InstructionId.Movsx : InstructionId.Movzx);
                         return;
                     }
                     if (srcType >= VariableType.Int32 && srcType <= VariableType.UInt32)
                     {
                         if (dstType == VariableType.Int64 && srcType == VariableType.Int32)
                         {
-                            extendMovGpXq(Compiler.Gpd(srcIndex), InstructionId.Movsxd);
+                            extendMovGpXq(Cpu.Gpd(srcIndex), InstructionId.Movsxd);
                         }
                         else
                         {
-                            extendMovGpDq(new Memory(dst, 4), Compiler.Gpd(srcIndex));
+                            extendMovGpDq(new Memory(dst, 4), Cpu.Gpd(srcIndex));
                         }
                         return;
                     }
@@ -1903,25 +1862,22 @@ namespace AsmJit.CompilerContext
                         movMmQ();
                         return;
                     }
-                    if (srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd)
-                    {
-                        movXmmQ();
-                    }
+                    if (srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd) movXmmQ();
                     break;
                 case VariableType.Mm:
                     if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt8)
                     {
-                        extendMovGpXq(Compiler.GpbLo(srcIndex), InstructionId.Movzx);
+                        extendMovGpXq(Cpu.GpbLo(srcIndex), InstructionId.Movzx);
                         return;
                     }
                     if (srcType >= VariableType.Int16 && srcType <= VariableType.UInt16)
                     {
-                        extendMovGpXq(Compiler.Gpw(srcIndex), InstructionId.Movzx);
+                        extendMovGpXq(Cpu.Gpw(srcIndex), InstructionId.Movzx);
                         return;
                     }
                     if (srcType >= VariableType.Int32 && srcType <= VariableType.UInt32)
                     {
-                        extendMovGpDq(new Memory(dst), Compiler.Gpd(srcIndex));
+                        extendMovGpDq(new Memory(dst), Cpu.Gpd(srcIndex));
                         return;
                     }
                     if (srcType >= VariableType.Int64 && srcType <= VariableType.UInt64)
@@ -1934,24 +1890,15 @@ namespace AsmJit.CompilerContext
                         movMmQ();
                         return;
                     }
-                    if (srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd)
-                    {
-                        movXmmQ();
-                    }
+                    if (srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd) movXmmQ();
                     break;
                 case VariableType.Fp32:
                 case VariableType.XmmSs:
-                    if (srcType == VariableType.XmmSs || srcType == VariableType.XmmPs || srcType == VariableType.Xmm)
-                    {
-                        movXmmQ();
-                    }
+                    if (srcType == VariableType.XmmSs || srcType == VariableType.XmmPs || srcType == VariableType.Xmm) movXmmQ();
                     break;
                 case VariableType.Fp64:
                 case VariableType.XmmSd:
-                    if (srcType == VariableType.XmmSd || srcType == VariableType.XmmPd || srcType == VariableType.Xmm)
-                    {
-                        movXmmQ();
-                    }
+                    if (srcType == VariableType.XmmSd || srcType == VariableType.XmmPd || srcType == VariableType.Xmm) movXmmQ();
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
@@ -1967,7 +1914,7 @@ namespace AsmJit.CompilerContext
                 if (i >= Cpu.Info.RegisterCount.Get(RegisterClass.Gp)) throw new ArgumentException();
                 if (regs.IsSet(0x1))
                 {
-                    var gpReg = new GpRegister((GpRegisterType) _assembler.Zsp.RegisterType, i);
+                    var gpReg = new GpRegister((GpRegisterType)Cpu.Zsp.RegisterType, i);
                     _compiler.Emit(InstructionId.Push, gpReg);
                 }
                 i++;
@@ -1987,7 +1934,7 @@ namespace AsmJit.CompilerContext
                 i--;
                 if (regs.IsSet(mask))
                 {
-                    var gpReg = new GpRegister((GpRegisterType) _assembler.Zsp.RegisterType, i);
+                    var gpReg = new GpRegister((GpRegisterType)Cpu.Zsp.RegisterType, i);
                     _compiler.Emit(InstructionId.Pop, gpReg);
                 }
                 mask >>= 1;
@@ -2023,10 +1970,7 @@ namespace AsmJit.CompilerContext
                         }
                         else
                         {
-                            if (!vd.IsMemoryArgument)
-                            {
-                                GetVarCell(vd);
-                            }
+                            if (!vd.IsMemoryArgument) GetVarCell(vd);
 
                             // Offset will be patched later by X86Context_patchFuncMem().
                             m.SetGpdBase((Cpu.Info.RegisterSize == 4).AsInt());
@@ -2119,10 +2063,7 @@ namespace AsmJit.CompilerContext
         {
             var size = vd.Info.Size;
             VariableCell cell;
-            if (vd.IsStack)
-            {
-                cell = CreateStackCell(size, vd.Alignment);
-            }
+            if (vd.IsStack) cell = CreateStackCell(size, vd.Alignment);
             else
             {
                 cell = new VariableCell
@@ -2179,7 +2120,6 @@ namespace AsmJit.CompilerContext
             {
                 var pPrev = _memStackCells;
                 var cur = pPrev;
-
 
                 var mi = 0;
                 VariableCell tmp0 = null;

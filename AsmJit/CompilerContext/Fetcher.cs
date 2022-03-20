@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using AsmJit.AssemblerContext;
 using AsmJit.Common;
+using AsmJit.Common.Enums;
+using AsmJit.Common.Extensions;
 using AsmJit.Common.Operands;
+using AsmJit.Common.Variables;
 using AsmJit.CompilerContext.CodeTree;
 
 namespace AsmJit.CompilerContext
@@ -31,6 +33,29 @@ namespace AsmJit.CompilerContext
         private FunctionDeclaration _functionDeclaration;
         private SArgData[] _sArgDatas;
         private List<CodeNode> _unreachableList;
+        private List<SpecialInstruction> specialInsts = new List<SpecialInstruction>()
+        {
+            new SpecialInstruction(0),
+            new SpecialInstruction(                                    VariableFlags.RReg),
+            new SpecialInstruction(                                 0, VariableFlags.RReg),
+            new SpecialInstruction(                  RegisterIndex.Ax, VariableFlags.RReg),
+            new SpecialInstruction(                  RegisterIndex.Bx, VariableFlags.RReg),
+            new SpecialInstruction(                  RegisterIndex.Cx, VariableFlags.RReg),
+            new SpecialInstruction(                  RegisterIndex.Dx, VariableFlags.RReg),
+            new SpecialInstruction(                  RegisterIndex.Di, VariableFlags.RReg),
+            new SpecialInstruction(                                    VariableFlags.WReg),
+            new SpecialInstruction(                  RegisterIndex.Ax, VariableFlags.WReg),
+            new SpecialInstruction(                  RegisterIndex.Bx, VariableFlags.WReg),
+            new SpecialInstruction(                  RegisterIndex.Cx, VariableFlags.WReg),
+            new SpecialInstruction(                  RegisterIndex.Dx, VariableFlags.WReg),
+            new SpecialInstruction(                                    VariableFlags.XReg),
+            new SpecialInstruction(RegisterIndex.Ax, RegisterIndex.Ax, VariableFlags.XReg),
+            new SpecialInstruction(RegisterIndex.Cx, RegisterIndex.Cx, VariableFlags.XReg),
+            new SpecialInstruction(                  RegisterIndex.Dx, VariableFlags.XReg),
+            new SpecialInstruction(RegisterIndex.Dx, RegisterIndex.Dx, VariableFlags.XReg),
+            new SpecialInstruction(RegisterIndex.Si, RegisterIndex.Si, VariableFlags.XReg),
+            new SpecialInstruction(RegisterIndex.Di, RegisterIndex.Di, VariableFlags.XReg),
+        };
 
         internal Fetcher(Compiler compiler, FunctionNode func)
         {
@@ -69,7 +94,7 @@ namespace AsmJit.CompilerContext
             {
                 if (result == Result.Done) break;
 
-                if (GoTo(@do: result != Result.NextGroup) == Result.Done) break;
+                if (GoTo(perform: result != Result.NextGroup) == Result.Done) break;
 
                 flowId++;
 
@@ -171,10 +196,9 @@ namespace AsmJit.CompilerContext
                 }
                 else
                 {
-                    if ((aType.GetRegisterClass() == vd.Info.RegisterClass) || (vType == VariableType.XmmSs && aType == VariableType.Fp32) || (vType == VariableType.XmmSd && aType == VariableType.Fp64))
-                    {
-                        va.Flags |= VariableFlags.WMem;
-                    }
+                    if ((aType.GetRegisterClass() == vd.Info.RegisterClass) || 
+                        (vType == VariableType.XmmSs && aType == VariableType.Fp32) || 
+                        (vType == VariableType.XmmSd && aType == VariableType.Fp64)) va.Flags |= VariableFlags.WMem;
                     else
                     {
                         // TODO: [COMPILER] Not implemented.
@@ -463,7 +487,8 @@ namespace AsmJit.CompilerContext
                 // Collect instruction flags and merge all 'VarAttr's.
                 if (extendedInfo.IsFp()) flags |= CodeNodeFlags.Fp;
 
-                if (extendedInfo.IsSpecial() && (special = instId.GetSpecialInstructions(opList)) != null) flags |= CodeNodeFlags.Special;
+                if (extendedInfo.IsSpecial() && (special = GetSpecialInstructions(instId, opList)) != null) flags |= CodeNodeFlags.Special;
+
                 var gpAllowedMask = Constants.InvalidValue;
                 for (var i = 0; i < opCount; i++)
                 {
@@ -716,10 +741,266 @@ namespace AsmJit.CompilerContext
             }
             return Result.Break;
         }
-
-        private Result GoTo(bool @do)
+        
+        private SpecialInstruction[] GetSpecialInstructions(InstructionId instId, Operand[] opList)
         {
-            if (!@do || _node.IsFetched())
+            switch (instId)
+            {
+                case InstructionId.Cpuid:
+                    return new[] { //_specialInstCpuid
+                        specialInsts[14],
+                        specialInsts[10],
+                        specialInsts[11],
+                        specialInsts[12],
+                    };
+
+                case InstructionId.Cbw:
+                case InstructionId.Cdqe:
+                case InstructionId.Cwde:
+                //return _specialInstCbwCdqeCwde
+                case InstructionId.Daa:
+                case InstructionId.Das:
+                    return new[] { //_specialInstDaaDas
+                        specialInsts[14],
+                    };
+
+                case InstructionId.Cdq:
+                case InstructionId.Cwd:
+                case InstructionId.Cqo:
+                    return new[] { //_specialInstCdqCwdCqo
+                        specialInsts[12],
+                        specialInsts[3],
+                    };
+
+                case InstructionId.Cmpxchg:
+                    return new[] { //_specialInstCmpxchg
+                        specialInsts[14],
+                        specialInsts[13],
+                        specialInsts[1],
+                    };
+
+                case InstructionId.Cmpxchg8b:
+                case InstructionId.Cmpxchg16b:
+                    return new[] { //_specialInstCmpxchg8b16b
+                        specialInsts[17],
+                        specialInsts[14],
+                        specialInsts[5],
+                        specialInsts[4],
+                    };
+
+                case InstructionId.Jecxz:
+                    return new[] { //_specialInstJecxz
+                        specialInsts[5],
+                    };
+
+                case InstructionId.Idiv:
+                case InstructionId.Div:
+                    return new[] { //_specialInstDiv
+                        specialInsts[16],
+                        specialInsts[14],
+                        specialInsts[1],
+                    };
+
+                case InstructionId.Imul:
+                case InstructionId.Mul:
+                    if (instId == InstructionId.Imul && opList.Length == 2) return null;
+                    if (instId == InstructionId.Imul && opList.Length == 3 && !(opList[0].IsVariable() && opList[1].IsVariable() && opList[2].IsVariableOrMemory())) return null;
+                    return new[] { //_specialInstMul
+                        specialInsts[12],
+                        specialInsts[14],
+                        specialInsts[1],
+                    };
+
+                case InstructionId.MovPtr:
+                    return new[] { //_specialInstMovPtr
+                        specialInsts[9],
+                        specialInsts[3],
+                    };
+
+                case InstructionId.LodsB:
+                case InstructionId.LodsD:
+                case InstructionId.LodsQ:
+                case InstructionId.LodsW:
+                case InstructionId.RepLodsB:
+                case InstructionId.RepLodsD:
+                case InstructionId.RepLodsQ:
+                case InstructionId.RepLodsW:
+                    return new[] { //_specialInstLods
+                        specialInsts[9],
+                        specialInsts[18],
+                        specialInsts[15],
+                    };
+
+                case InstructionId.CmpsB:
+                case InstructionId.CmpsD:
+                case InstructionId.CmpsQ:
+                case InstructionId.CmpsW:
+                case InstructionId.RepeCmpsB:
+                case InstructionId.RepeCmpsD:
+                case InstructionId.RepeCmpsQ:
+                case InstructionId.RepeCmpsW:
+                case InstructionId.RepneCmpsB:
+                case InstructionId.RepneCmpsD:
+                case InstructionId.RepneCmpsQ:
+                case InstructionId.RepneCmpsW:
+                //return _specialInstMovsCmps;
+                case InstructionId.MovsB:
+                case InstructionId.MovsD:
+                case InstructionId.MovsQ:
+                case InstructionId.MovsW:
+                case InstructionId.RepMovsB:
+                case InstructionId.RepMovsD:
+                case InstructionId.RepMovsQ:
+                case InstructionId.RepMovsW:
+                    return new[] { //_specialInstMovsCmps
+                        specialInsts[19],
+                        specialInsts[18],
+                        specialInsts[15],
+                    };
+
+                case InstructionId.Lahf:
+                    return new[] { //_specialInstLahf
+                        specialInsts[9],
+                    };
+
+                case InstructionId.Sahf:
+                    return new[] { //_specialInstSahf
+                        specialInsts[3],
+                    };
+
+                case InstructionId.Maskmovq:
+                case InstructionId.Maskmovdqu:
+                    return new[] { //_specialInstMaskmovqMaskmovdqu
+                        specialInsts[7],
+                        specialInsts[1],
+                        specialInsts[1],
+                    };
+
+                case InstructionId.Enter:
+                case InstructionId.Leave:
+                //return null;
+                case InstructionId.Ret:
+                //return null;
+                case InstructionId.Monitor:
+                case InstructionId.Mwait:
+                //return null;
+                case InstructionId.Pop:
+                //return null;
+                case InstructionId.Popa:
+                case InstructionId.Popf:
+                //return null;
+                case InstructionId.Push:
+                //return null;
+                case InstructionId.Pusha:
+                case InstructionId.Pushf:
+                    return null;
+
+                case InstructionId.Rcl:
+                case InstructionId.Rcr:
+                case InstructionId.Rol:
+                case InstructionId.Ror:
+                case InstructionId.Sal:
+                case InstructionId.Sar:
+                case InstructionId.Shl:
+                case InstructionId.Shr:
+                    if (!opList[1].IsVariable()) return null;
+                    return new[] { //_specialInstRot
+                        specialInsts[13],
+                        specialInsts[5],
+                    };
+
+                case InstructionId.Shld:
+                case InstructionId.Shrd:
+                    if (!opList[2].IsVariable()) return null;
+                    return new[] { //_specialInstShlrd
+                        specialInsts[13],
+                        specialInsts[1],
+                        specialInsts[5],
+                    };
+
+                case InstructionId.Rdtsc:
+                case InstructionId.Rdtscp:
+                    return new[] { //_specialInstRdtscRdtscp
+                        specialInsts[12],
+                        specialInsts[9],
+                        specialInsts[11],
+                    };
+
+                case InstructionId.ScasB:
+                case InstructionId.ScasD:
+                case InstructionId.ScasQ:
+                case InstructionId.ScasW:
+                case InstructionId.RepeScasB:
+                case InstructionId.RepeScasD:
+                case InstructionId.RepeScasQ:
+                case InstructionId.RepeScasW:
+                case InstructionId.RepneScasB:
+                case InstructionId.RepneScasD:
+                case InstructionId.RepneScasQ:
+                case InstructionId.RepneScasW:
+                    return new[] { //_specialInstScas
+                        specialInsts[19],
+                        specialInsts[3],
+                        specialInsts[15],
+                    };
+
+                case InstructionId.StosB:
+                case InstructionId.StosD:
+                case InstructionId.StosQ:
+                case InstructionId.StosW:
+                case InstructionId.RepStosB:
+                case InstructionId.RepStosD:
+                case InstructionId.RepStosQ:
+                case InstructionId.RepStosW:
+                    return new[] { //_specialInstStos
+                        specialInsts[7],
+                        specialInsts[3],
+                        specialInsts[15],
+                    };
+
+                case InstructionId.Blendvpd:
+                case InstructionId.Blendvps:
+                case InstructionId.Pblendvb:
+                    return new[] { //_specialInstBlend
+                        specialInsts[8],
+                        specialInsts[1],
+                        specialInsts[2],
+                    };
+
+                case InstructionId.Xrstor:
+                case InstructionId.Xrstor64:
+                case InstructionId.Xsave:
+                case InstructionId.Xsave64:
+                case InstructionId.Xsaveopt:
+                case InstructionId.Xsaveopt64:
+                    return new[] { //_specialInstXsaveXrstor
+                        specialInsts[0],
+                        specialInsts[6],
+                        specialInsts[3],
+                    };
+
+                case InstructionId.Xgetbv:
+                    return new[] { //_specialInstXgetbv
+                        specialInsts[5],
+                        specialInsts[12],
+                        specialInsts[9],
+                    };
+
+                case InstructionId.Xsetbv:
+                    return new[] { //_specialInstXsetbv
+                        specialInsts[5],
+                        specialInsts[6],
+                        specialInsts[3],
+                    };
+
+                default:
+                    return null;
+            }
+        }
+
+        private Result GoTo(bool perform)
+        {
+            if (!perform || _node.IsFetched())
             {
                 if (_jLinkIndex == -1) _jLinkIndex = 0;
                 else _jLinkIndex++;

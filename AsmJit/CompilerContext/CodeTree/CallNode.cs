@@ -1,5 +1,6 @@
 using System;
 using AsmJit.Common;
+using AsmJit.Common.Extensions;
 using AsmJit.Common.Operands;
 
 namespace AsmJit.CompilerContext.CodeTree
@@ -9,6 +10,10 @@ namespace AsmJit.CompilerContext.CodeTree
         private int currArgLen;
         private int currRetLen;
         private RegisterMask _usedArgs;
+
+        internal readonly Operand[] Return;
+        internal readonly Operand[] Arguments;
+        internal readonly FunctionDeclaration FunctionDeclaration;
 
         internal CallNode(Operand target, FunctionDeclaration decl) : base(CodeNodeType.Call)
         {
@@ -43,7 +48,7 @@ namespace AsmJit.CompilerContext.CodeTree
             return r;
         }
 
-        internal Operand Target { get; set; }
+        internal Operand Target;
 
         internal RegisterMask UsedArgs
         {
@@ -66,12 +71,5 @@ namespace AsmJit.CompilerContext.CodeTree
                 return _usedArgs = regs;
             }
         }
-
-        internal Operand[] Return { get; private set; }
-
-        internal Operand[] Arguments { get; private set; }
-
-        internal FunctionDeclaration FunctionDeclaration { get; private set; }
-
     }
 }

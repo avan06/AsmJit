@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common;
+using AsmJit.Common.Enums;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 
@@ -16,10 +16,11 @@ namespace AsmJitTest.TestCases
 
             var vHi = c.Int32("vHi");
 
-            c.Emit(InstructionId.Imul, vHi, vLo, src);
+            c.Emit(
+                InstructionId.Imul, vHi, vLo, src,
 
-            c.Emit(InstructionId.Mov, Memory.DWord(dstHi), vHi);
-            c.Emit(InstructionId.Mov, Memory.DWord(dstLo), vLo);
+                InstructionId.Mov, Memory.DWord(dstHi), vHi,
+                InstructionId.Mov, Memory.DWord(dstLo), vLo);
         }
 
         protected override void Execute(Action<IntPtr, IntPtr, int, int> fn, out string result, out string expected)

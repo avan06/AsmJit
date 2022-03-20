@@ -1,6 +1,6 @@
 using System;
-using AsmJit.AssemblerContext;
 using AsmJit.Common;
+using AsmJit.Common.Enums;
 using AsmJit.Common.Operands;
 using CodeContext = AsmJit.CompilerContext.CodeContext;
 
@@ -19,12 +19,13 @@ namespace AsmJitTest.TestCases
             c.Allocate(a2, Cpu.Registers.Ebx);
             c.Allocate(a3, Cpu.Registers.Ecx);
 
-            //var call = c.Call(Memory.Fn(new Action<int, int>(CalledFunction)));
+            //var call = c.Call(FnPointer.Fn(new Action<int, int>(CalledFunction)));
             //call.SetArgument(a);
             //call.SetArgument(b);
 
-            c.Emit(InstructionId.Lea, r, Memory.Ptr(a1, a2));
-            c.Emit(InstructionId.Lea, r, Memory.Ptr(r, a3));
+            c.Emit(
+                InstructionId.Lea, r, Memory.Ptr(a1, a2),
+                InstructionId.Lea, r, Memory.Ptr(r, a3));
             c.Ret(r);
         }
 

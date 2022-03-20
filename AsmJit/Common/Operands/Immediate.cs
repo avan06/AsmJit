@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using AsmJit.Common.Extensions;
 
 namespace AsmJit.Common.Operands
 {

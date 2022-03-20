@@ -1,6 +1,5 @@
 ﻿using System;
-using AsmJit.Common;
-using AsmJit.Common.Operands;
+using AsmJit.Common.Enums;
 using AsmJit.CompilerContext;
 
 namespace AsmJitTest.TestCases
@@ -23,7 +22,7 @@ namespace AsmJitTest.TestCases
 
             c.Bind(l3);
 
-            c.Ret();	
+            c.Ret();
         }
 
         protected override void Execute(Action fn, out string result, out string expected)

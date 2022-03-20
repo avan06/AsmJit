@@ -1,77 +1,78 @@
-﻿using AsmJit.AssemblerContext;
-using AsmJit.Common;
+﻿using AsmJit.Common;
+using AsmJit.Common.Enums;
+using AsmJit.Common.Variables;
 using AsmJit.CompilerContext.CodeTree;
 
 namespace AsmJit.CompilerContext
 {
-	internal abstract class Allocator
-	{
-		protected Assembler Assembler;
-		protected Compiler Compiler;
-		protected CodeContext CodeContext;
-		protected Translator Translator;
-		protected VariableContext VariableContext;
-		protected CodeNode Node;
-		protected VariableMap Map;
-		protected VariableAttributes[][] VaList;//[_kX86RegClassManagedCount];
-		private int _vaCount;
-		protected RegisterCount Count = new RegisterCount();
-		protected RegisterCount Done = new RegisterCount();
+    internal abstract class Allocator
+    {
+        internal const int MaxLookAhead = 64;
 
-		protected Allocator(Assembler assembler, Compiler compiler, CodeContext codeContext, Translator translator, VariableContext variableContext)
-		{
-			Assembler = assembler;
-			Compiler = compiler;
-			CodeContext = codeContext;
-			Translator = translator;
-			VariableContext = variableContext;
-			VaList = new VariableAttributes[4][];
-		}
+        protected Compiler Compiler;
+        protected CodeContext CodeContext;
+        protected Translator Translator;
+        protected VariableContext VariableContext;
+        protected CodeNode Node;
+        protected VariableMap Map;
+        protected VariableAttributes[][] VaList;//[_kX86RegClassManagedCount];
+        private int _vaCount;
+        protected RegisterCount Count = new RegisterCount();
+        protected RegisterCount Done = new RegisterCount();
 
-		protected void Init(CodeNode node, VariableMap map)
-		{
-			Node = node;
-			Map = map;
+        protected Allocator(Compiler compiler, CodeContext codeContext, Translator translator, VariableContext variableContext)
+        {
+            Compiler = compiler;
+            CodeContext = codeContext;
+            Translator = translator;
+            VariableContext = variableContext;
+            VaList = new VariableAttributes[4][];
+        }
 
-			// We have to set the correct cursor in case any instruction is emitted
-			// during the allocation phase; it has to be emitted before the current
-			// instruction.
-			Compiler.SetCurrentNode(node.Previous);
+        protected void Init(CodeNode node, VariableMap map)
+        {
+            Node = node;
+            Map = map;
 
-			// Setup the lists of variables.
-			{
-				VaList[(int)RegisterClass.Gp] = map.GetListByClass(RegisterClass.Gp);
-				VaList[(int)RegisterClass.Mm] = map.GetListByClass(RegisterClass.Mm);
-				VaList[(int)RegisterClass.K] = map.GetListByClass(RegisterClass.K);
-				VaList[(int)RegisterClass.Xyz] = map.GetListByClass(RegisterClass.Xyz);
-			}
+            // We have to set the correct cursor in case any instruction is emitted
+            // during the allocation phase; it has to be emitted before the current
+            // instruction.
+            Compiler.SetCurrentNode(node.Previous);
 
-			// Setup counters.
-			_vaCount = map.Attributes.Length;
+            // Setup the lists of variables.
+            {
+                VaList[(int)RegisterClass.Gp] = map.GetListByClass(RegisterClass.Gp);
+                VaList[(int)RegisterClass.Mm] = map.GetListByClass(RegisterClass.Mm);
+                VaList[(int)RegisterClass.K] = map.GetListByClass(RegisterClass.K);
+                VaList[(int)RegisterClass.Xyz] = map.GetListByClass(RegisterClass.Xyz);
+            }
 
-			Count.CopyFrom(map.Count);
-			Done.Reset();
+            // Setup counters.
+            _vaCount = map.Attributes.Length;
 
-			// Connect Vd->Va.
-			for (var i = 0; i < _vaCount; i++)
-			{
-				var va = VaList[0][i];
-				var vd = va.VariableData;
+            Count.CopyFrom(map.Count);
+            Done.Reset();
 
-				vd.Attributes = va;
-			}
-		}
+            // Connect Vd->Va.
+            for (var i = 0; i < _vaCount; i++)
+            {
+                var va = VaList[0][i];
+                var vd = va.VariableData;
 
-		protected void Cleanup()
-		{
-			// Disconnect Vd->Va.
-			for (var i = 0; i < _vaCount; i++)
-			{
-				var va = VaList[0][i];
-				var vd = va.VariableData;
+                vd.Attributes = va;
+            }
+        }
 
-				vd.Attributes = null;
-			}
-		}
-	}
+        protected void Cleanup()
+        {
+            // Disconnect Vd->Va.
+            for (var i = 0; i < _vaCount; i++)
+            {
+                var va = VaList[0][i];
+                var vd = va.VariableData;
+
+                vd.Attributes = null;
+            }
+        }
+    }
 }

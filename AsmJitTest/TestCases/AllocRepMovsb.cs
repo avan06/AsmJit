@@ -1,6 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
-using AsmJit.Common;
+using AsmJit.Common.Enums;
 using AsmJit.CompilerContext;
 
 namespace AsmJitTest.TestCases

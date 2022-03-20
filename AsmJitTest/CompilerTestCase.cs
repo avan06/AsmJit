@@ -18,23 +18,23 @@ namespace AsmJitTest
 
         public void Add(TestCase testCase) => _testCases.Add(testCase);
 
-        public IEnumerable<(string name, bool result, string disasm)> Run()
+        public IEnumerable<(string name, bool result, string value, string expected, string disasm)> Run()
         {
             foreach (var testCase in _testCases)
             {
                 bool res = false;
-                string disasm = null;
-                try { res = _disasm ? testCase.Run(out disasm) : testCase.Run(); }
-                catch (Exception ex) { Console.WriteLine(ex.StackTrace); }
-                yield return (testCase.GetType().Name, res, disasm);
+                string value = null, expected = null, disasm = null;
+                try { res = _disasm ? testCase.Run(out value, out expected, out disasm) : testCase.Run(out value, out expected); }
+                catch (Exception ex) { Console.WriteLine(ex.Message + "\n" + ex.StackTrace); }
+                yield return (testCase.GetType().Name, res, value, expected, disasm);
             }
         }
     }
 
     public abstract class TestCase
     {
-        public abstract bool Run();
-        public abstract bool Run(out string disassemly);
+        public abstract bool Run(out string value, out string expected);
+        public abstract bool Run(out string value, out string expected, out string disassemly);
     }
 
     public abstract class CompilerTestCase<T> : TestCase
@@ -43,23 +43,17 @@ namespace AsmJitTest
 
         protected CompilerTestCase() => _ctx = Compiler.CreateContext<T>();
 
-        public override bool Run()
+        public override bool Run(out string value, out string expected)
         {
             Compile(_ctx);
-            string result;
-            string expected;
-            Execute(_ctx.Compile(), out result, out expected);
-            return result == expected;
+            Execute(_ctx.Compile(), out value, out expected);
+            return value == expected;
         }
 
-        public override unsafe bool Run(out string disassemly)
+        public override unsafe bool Run(out string value, out string expected, out string disassemly)
         {
             Compile(_ctx);
-            string result;
-            string expected;
-            IntPtr fp;
-            int codeSize;
-            Execute(_ctx.Compile(out fp, out codeSize), out result, out expected);
+            Execute(_ctx.Compile(out IntPtr fp, out int codeSize), out value, out expected);
             var tmp = Marshal.AllocHGlobal(codeSize);
             Buffer.MemoryCopy((void*)fp, (void*)tmp, codeSize, codeSize);
             const ArchitectureMode mode = ArchitectureMode.x86_64;
@@ -68,7 +62,7 @@ namespace AsmJitTest
             var disasm = new Disassembler(tmp, codeSize, mode, (ulong)fp.ToInt64(), true);
             disassemly = disasm.Disassemble().Aggregate("", (current, insn) => current + insn + Environment.NewLine);
             Marshal.FreeHGlobal(tmp);
-            return result == expected;
+            return value == expected;
         }
 
         protected abstract void Compile(CodeContext c);
@@ -81,32 +75,35 @@ namespace AsmJitTest
 
         protected AssemblerTestCase() => _ctx = Assembler.CreateContext<T>();
 
-        public override bool Run()
+        public override bool Run(out string value, out string expected)
         {
             Compile(_ctx);
-            string result;
-            string expected;
-            Execute(_ctx.Compile(), out result, out expected);
-            return result == expected;
+            Execute(_ctx.Compile(), out value, out expected);
+            return value == expected;
         }
 
-        public override unsafe bool Run(out string disassemly)
+        public override unsafe bool Run(out string value, out string expected, out string disassemly)
         {
             Compile(_ctx);
-            string result;
-            string expected;
-            IntPtr fp;
-            int codeSize;
-            Execute(_ctx.Compile(out fp, out codeSize), out result, out expected);
+            Execute(_ctx.Compile(out IntPtr fp, out int codeSize), out value, out expected);
             var tmp = Marshal.AllocHGlobal(codeSize);
             Buffer.MemoryCopy((void*)fp, (void*)tmp, codeSize, codeSize);
+            //
+            //byte[] managedArray = new byte[codeSize];
+            //Marshal.Copy(fp, managedArray, 0, codeSize);
+            //for (int idx = 0; idx < managedArray.Length; idx++)
+            //{
+            //    if (idx > 0 && idx % 8 == 0) Console.WriteLine();
+            //    Console.Write(managedArray[idx].ToString("X") + " ");
+            //}
+            //
             const ArchitectureMode mode = ArchitectureMode.x86_64;
             Disassembler.Translator.IncludeAddress = true;
             Disassembler.Translator.IncludeBinary = true;
             var disasm = new Disassembler(tmp, codeSize, mode, (ulong)fp.ToInt64(), true);
             disassemly = disasm.Disassemble().Aggregate("", (current, insn) => current + insn + Environment.NewLine);
             Marshal.FreeHGlobal(tmp);
-            return result == expected;
+            return value == expected;
         }
 
         protected abstract void Compile(AsmJit.AssemblerContext.CodeContext c);

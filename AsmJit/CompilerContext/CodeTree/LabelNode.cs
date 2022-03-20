@@ -1,22 +1,15 @@
 namespace AsmJit.CompilerContext.CodeTree
 {
-	internal sealed class LabelNode : CodeNode
-	{
-		public LabelNode(int labelId)
-			: base(CodeNodeType.Label)
-		{
-			LabelId = labelId;
-		}
+    internal sealed class LabelNode : CodeNode
+    {
+        public readonly int LabelId;
 
-		public int LabelId { get; private set; }
+        public int ReferenceCount;
 
-		public int ReferenceCount { get; set; }
+        public JumpNode From;
 
-		public JumpNode From { get; set; }
+        public LabelNode(int labelId) : base(CodeNodeType.Label) => LabelId = labelId;
 
-		public override string ToString()
-		{
-			return string.Format("[{0}] {1}: Id={2}, From=({3})", FlowId == 0 ? "#" : FlowId.ToString(), Type, LabelId, From);
-		}
-	}
+        public override string ToString() => string.Format("[{0}] {1}: Id={2}, From=({3})", FlowId == 0 ? "#" : FlowId.ToString(), Type, LabelId, From);
+    }
 }

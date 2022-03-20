@@ -1,21 +1,22 @@
+using AsmJit.Common.Variables;
+
 namespace AsmJit.CompilerContext.CodeTree
 {
-	internal sealed class CallArgumentNode : CodeNode
-	{
-		public CallArgumentNode(CallNode call, VariableData src, VariableData conv)
-			: base(CodeNodeType.CallArgument)
-		{
-			Call = call;
-			Source = src;
-			Conv = conv;
-		}
+    internal sealed class CallArgumentNode : CodeNode
+    {
+        public readonly CallNode Call;
 
-		public CallNode Call { get; private set; }
+        public readonly VariableData Source;
 
-		public VariableData Source { get; private set; }
+        public readonly VariableData Conv;
 
-		public VariableData Conv { get; private set; }
+        public int AffectedArguments;
 
-		public int AffectedArguments { get; set; }
-	}
+        public CallArgumentNode(CallNode call, VariableData src, VariableData conv) : base(CodeNodeType.CallArgument)
+        {
+            Call = call;
+            Source = src;
+            Conv = conv;
+        }
+    }
 }

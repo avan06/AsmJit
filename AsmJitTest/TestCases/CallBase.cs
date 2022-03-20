@@ -1,7 +1,8 @@
 using System;
-using AsmJit.Common;
+using AsmJit.Common.Enums;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
+using AsmJit.CompilerContext.CodeTree;
 
 namespace AsmJitTest.TestCases
 {
@@ -17,7 +18,7 @@ namespace AsmJitTest.TestCases
             c.SetArgument(v1);
             c.SetArgument(v2);
 
-            var fp = Memory.Fn(new Func<int, int, int, int>(CalledFunction));
+            var fp = FnPointer.Fn(new Func<int, int, int, int>(CalledFunction));
 
             // Just do something.
             c.Emit(InstructionId.Shl, v0, (Immediate)1);

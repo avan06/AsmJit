@@ -1,5 +1,6 @@
 using System;
-using AsmJit.Common;
+using AsmJit.Common.Enums;
+using AsmJit.Common.Extensions;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 

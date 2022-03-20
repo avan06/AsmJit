@@ -1,6 +1,7 @@
 ﻿using System;
-using AsmJit.AssemblerContext;
 using AsmJit.Common;
+using AsmJit.Common.Enums;
+using AsmJit.Common.Extensions;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext.CodeTree;
 
@@ -8,13 +9,13 @@ namespace AsmJit.CompilerContext
 {
     internal sealed class CodeProcessor
     {
-        private Assembler _assembler;
+        private AssemblerBase _assemblerBase;
         private Compiler _compiler;
         private CodeContext _codeContext;
 
-        internal CodeProcessor(Assembler assembler, Compiler compiler, CodeContext codeContext)
+        internal CodeProcessor(AssemblerBase assemblerBase, Compiler compiler, CodeContext codeContext)
         {
-            _assembler = assembler;
+            _assemblerBase = assemblerBase;
             _compiler = compiler;
             _codeContext = codeContext;
         }
@@ -25,7 +26,7 @@ namespace AsmJit.CompilerContext
             var vc = fetcher.Run();
             var analyzer = new LivenessAnalyzer(func, vc);
             analyzer.Run();
-            var translator = new Translator(_assembler, _compiler, _codeContext, func, vc);
+            var translator = new Translator(_assemblerBase, _compiler, _codeContext, func, vc);
             translator.Run();
         }
 
@@ -208,19 +209,19 @@ namespace AsmJit.CompilerContext
                             if (opCount > 2) o2 = opList[2];
                             if (opCount > 3) o3 = opList[3];
                         }
-                        _assembler.Emit(instId, node.InstructionOptions, o0, o1, o2, o3);
+                        _assemblerBase.Emit(instId, node.InstructionOptions, o0, o1, o2, o3);
                         break;
                     case CodeNodeType.Data:
                         var dnode = current.As<DataNode>();
-                        _assembler.Embed(dnode.Data, dnode.Size);
+                        _assemblerBase.Embed(dnode.Data, dnode.Size);
                         break;
                     case CodeNodeType.Alignment:
                         var anode = current.As<AlignNode>();
-                        _assembler.Align(anode.AlignMode, anode.Offset);
+                        _assemblerBase.Align(anode.AlignMode, anode.Offset);
                         break;
                     case CodeNodeType.Label:
                         var lnode = current.As<LabelNode>();
-                        _assembler.Bind(lnode.LabelId);
+                        _assemblerBase.Bind(lnode.LabelId);
                         break;
                     case CodeNodeType.Comment:
                     case CodeNodeType.Hint:
@@ -230,12 +231,12 @@ namespace AsmJit.CompilerContext
                         break;
                     case CodeNodeType.Call:
                         var clnode = current.As<CallNode>();
-                        _assembler.Emit(InstructionId.Call, InstructionOptions.None, clnode.Target);
+                        _assemblerBase.Emit(InstructionId.Call, InstructionOptions.None, clnode.Target);
                         break;
                     case CodeNodeType.CallArgument:
                         break;
                     default:
-                        throw new ArgumentOutOfRangeException("", "Not must be reached");
+                        throw new ArgumentOutOfRangeException("CodeNodeType", current.Type, "Not must be reached");
                 }
                 current = current.Next;
             } while (current != stop);

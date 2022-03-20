@@ -1,7 +1,8 @@
 using System;
-using AsmJit.Common;
+using AsmJit.Common.Enums;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
+using AsmJit.CompilerContext.CodeTree;
 
 namespace AsmJitTest.TestCases
 {
@@ -24,20 +25,22 @@ namespace AsmJitTest.TestCases
                 var ptr = c.IntPtr("ptr");
                 var idx = c.Int32("idx");
 
-                c.Emit(InstructionId.Mov, ptr, buf);
-                c.Emit(InstructionId.Mov, idx, (Immediate)i);
+                c.Emit(
+                    InstructionId.Mov, ptr, buf,
+                    InstructionId.Mov, idx, (Immediate)i);
 
-                var call = c.Call(Memory.Fn(new Func<IntPtr, int, int>(CalledFunction)/*, CallingConvention.HostDefaultFast*/));
+                var call = c.Call(FnPointer.Fn(new Func<IntPtr, int, int>(CalledFunction)/*, CallingConvention.HostDefaultFast*/));
                 call.SetArgument(0, ptr);
                 call.SetArgument(1, idx);
                 call.SetReturn(0, ret);
 
-                c.Emit(InstructionId.Add, acc0, ret);
+                c.Emit(
+                    InstructionId.Add, acc0, ret,
 
-                c.Emit(InstructionId.Mov, ptr, buf);
-                c.Emit(InstructionId.Mov, idx, (Immediate)i);
+                    InstructionId.Mov, ptr, buf,
+                    InstructionId.Mov, idx, (Immediate)i);
 
-                call = c.Call(Memory.Fn(new Func<IntPtr, int, int>(CalledFunction)/*, CallingConvention.HostDefaultFast*/));
+                call = c.Call(FnPointer.Fn(new Func<IntPtr, int, int>(CalledFunction)/*, CallingConvention.HostDefaultFast*/));
                 call.SetArgument(0, ptr);
                 call.SetArgument(1, idx);
                 call.SetReturn(0, ret);

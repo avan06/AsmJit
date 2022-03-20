@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common;
+using AsmJit.Common.Enums;
 using AsmJit.CompilerContext;
 
 namespace AsmJitTest.TestCases
@@ -16,14 +16,16 @@ namespace AsmJitTest.TestCases
             var aIdx = c.SetArgument(c.Int32("aIdx"));
             var aEnd = c.SetArgument(c.Int32("aEnd"));
 
-            c.Emit(InstructionId.Mov, iIdx, aIdx);
-            c.Emit(InstructionId.Mov, iEnd, aEnd);
+            c.Emit(
+                InstructionId.Mov, iIdx, aIdx,
+                InstructionId.Mov, iEnd, aEnd);
             c.Spill(iEnd);
 
             c.Bind(l1);
-            c.Emit(InstructionId.Inc, iIdx);
-            c.Emit(InstructionId.Cmp, iIdx, iEnd.ToMemory());
-            c.Emit(InstructionId.Jne, l1);
+            c.Emit(
+                InstructionId.Inc, iIdx,
+                InstructionId.Cmp, iIdx, iEnd.ToMemory(),
+                InstructionId.Jne, l1);
 
             c.Ret(iIdx);
         }

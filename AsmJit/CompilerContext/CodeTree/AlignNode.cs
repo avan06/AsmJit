@@ -1,18 +1,17 @@
-using AsmJit.Common;
+using AsmJit.Common.Enums;
 
 namespace AsmJit.CompilerContext.CodeTree
 {
-	internal sealed class AlignNode : CodeNode
-	{
-		public AlignNode(AligningMode alignMode, int offset)
-			: base(CodeNodeType.Alignment)
-		{
-			AlignMode = alignMode;
-			Offset = offset;
-		}
+    internal sealed class AlignNode : CodeNode
+    {
+        public readonly AligningMode AlignMode;
 
-		public AligningMode AlignMode { get; private set; }
+        public readonly int Offset;
 
-		public int Offset { get; private set; }
-	}
+        public AlignNode(AligningMode alignMode, int offset) : base(CodeNodeType.Alignment)
+        {
+            AlignMode = alignMode;
+            Offset = offset;
+        }
+    }
 }

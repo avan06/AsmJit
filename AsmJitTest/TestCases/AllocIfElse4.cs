@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common;
+using AsmJit.Common.Enums;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 
@@ -19,25 +19,27 @@ namespace AsmJitTest.TestCases
             var loop2 = c.Label();
             var exit = c.Label();
 
-            c.Emit(InstructionId.Mov, counter, (Immediate)0);
+            c.Emit(
+                InstructionId.Mov, counter, (Immediate)0,
 
-            c.Emit(InstructionId.Cmp, v1, v2);
-            c.Emit(InstructionId.Jg, l1);
+                InstructionId.Cmp, v1, v2,
+                InstructionId.Jg, l1);
 
             c.Bind(loop1);
-            c.Emit(InstructionId.Mov, v1, counter);
-
-            c.Emit(InstructionId.Inc, counter);
-            c.Emit(InstructionId.Cmp, counter, (Immediate)1);
-            c.Emit(InstructionId.Jle, loop1);
-            c.Emit(InstructionId.Jmp, exit);
+            c.Emit(
+                InstructionId.Mov, v1, counter,
+                InstructionId.Inc, counter,
+                InstructionId.Cmp, counter, (Immediate)1,
+                InstructionId.Jle, loop1,
+                InstructionId.Jmp, exit);
 
             c.Bind(l1);
             c.Bind(loop2);
-            c.Emit(InstructionId.Mov, v1, counter);
-            c.Emit(InstructionId.Inc, counter);
-            c.Emit(InstructionId.Cmp, counter, (Immediate)2);
-            c.Emit(InstructionId.Jle, loop2);
+            c.Emit(
+                InstructionId.Mov, v1, counter,
+                InstructionId.Inc, counter,
+                InstructionId.Cmp, counter, (Immediate)2,
+                InstructionId.Jle, loop2);
 
             c.Bind(exit);
             c.Ret(v1);

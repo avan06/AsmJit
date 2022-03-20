@@ -1,15 +1,9 @@
 namespace AsmJit.Common.Operands
 {
-	public class MmVariable : Variable
-	{
-		internal MmVariable()
-			: base(VariableType.Mm)
-		{
-		}
+    public class MmVariable : Variable
+    {
+        internal MmVariable() : base(VariableType.Mm) { }
 
-		internal MmVariable(MmVariable other)
-			: base(other)
-		{
-		}
-	}
+        internal MmVariable(MmVariable other): base(other) { }
+    }
 }

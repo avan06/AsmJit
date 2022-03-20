@@ -1,4 +1,4 @@
-using AsmJit.CompilerContext;
+using AsmJit.Common.Extensions;
 
 namespace AsmJit.Common.Operands
 {

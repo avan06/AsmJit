@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using AsmJit.Common;
+using AsmJit.Common.Enums;
+using AsmJit.Common.Extensions;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext.CodeTree;
 
@@ -25,12 +28,12 @@ namespace AsmJit.CompilerContext
         }
     }
 
-    public partial class CodeContext
+    public partial class CodeContext : CodeContextBase
     {
         private int currArgLen;
 
         protected Compiler Compiler;
-        
+
         internal CodeContext(Compiler compiler) => Compiler = compiler;
 
         public Label Entry { get => Compiler.GetEntryLabel(); }
@@ -80,15 +83,9 @@ namespace AsmJit.CompilerContext
 
         public void Data(Label label, int alignment, params Data[] data) => Compiler.Data(label, alignment, data);
 
-        //		public void Data(params DataBlock[] data)
-        //		{
-        //			Compiler.Data(data);
-        //		}
+        //		public void Data(params DataBlock[] data) => Compiler.Data(data);
         //
-        //		public void DataBlock(Action<DataContext> dataBlock)
-        //		{
-        //			Compiler.Data(dataBlock);
-        //		}
+        //		public void DataBlock(Action<DataContext> dataBlock) => Compiler.Data(dataBlock);
 
         public StackMemory Stack(int size, int alignment, string name = null) => Compiler.CreateStack(size, alignment, name);
 
@@ -126,5 +123,28 @@ namespace AsmJit.CompilerContext
                 return Compiler.CreateConstant(scope, p, 4);
             }
         }
+
+        public void Emit(InstructionId instructionId, params dynamic[] insts)
+        {
+            List<Operand> ops = new List<Operand>();
+            for (int i = 0; i < insts.Length; i++)
+            {
+                if (insts[i].GetType() == typeof(InstructionId))
+                {
+                    Compiler.Emit(instructionId, ops.ToArray());
+                    instructionId = insts[i];
+                    ops.Clear();
+                    continue;
+                }
+                ops.Add(insts[i]);
+            }
+            Compiler.Emit(instructionId, ops.ToArray());
+        }
+
+        public void Int3() => Compiler.Emit(InstructionId.Int, (Immediate)3);
+
+        public void Jmp(Pointer dst) => Compiler.Emit(InstructionId.Jmp, new Immediate((long)dst));//Jmp(new Immediate((long)dst));
+
+        public void Ret(Operand o0 = null, Operand o1 = null) => Compiler.CreateReturn(o0, o1);
     }
 }

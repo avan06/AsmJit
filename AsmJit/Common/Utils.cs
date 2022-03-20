@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using AsmJit.Common.Extensions;
 
 namespace AsmJit.Common
 {

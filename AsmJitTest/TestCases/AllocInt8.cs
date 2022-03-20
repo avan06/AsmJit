@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common;
+using AsmJit.Common.Enums;
 using AsmJit.CompilerContext;
 
 namespace AsmJitTest.TestCases

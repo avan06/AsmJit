@@ -1,6 +1,6 @@
 using System;
 using System.Text;
-using AsmJit.Common;
+using AsmJit.Common.Enums;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 
@@ -74,27 +74,28 @@ namespace AsmJitTest
             c.SetArgument(r0, r1, r2, r3);
 
             // Load values arguments point to (dereference IntPtr)
-            // eax = *r0
-            c.Emit(InstructionId.Mov, eax, X64 ? Memory.QWord(r0) : Memory.DWord(r0));
-            // ebx = *r1
-            c.Emit(InstructionId.Mov, ebx, X64 ? Memory.QWord(r1) : Memory.DWord(r1));
-            // ecx = *r2
-            c.Emit(InstructionId.Mov, ecx, X64 ? Memory.QWord(r2) : Memory.DWord(r2));
-            // edx = *r3
-            c.Emit(InstructionId.Mov, edx, X64 ? Memory.QWord(r3) : Memory.DWord(r3));
+            c.Emit(
+                // eax = *r0
+                InstructionId.Mov, eax, X64 ? Memory.QWord(r0) : Memory.DWord(r0),
+                // ebx = *r1
+                InstructionId.Mov, ebx, X64 ? Memory.QWord(r1) : Memory.DWord(r1),
+                // ecx = *r2
+                InstructionId.Mov, ecx, X64 ? Memory.QWord(r2) : Memory.DWord(r2),
+                // edx = *r3
+                InstructionId.Mov, edx, X64 ? Memory.QWord(r3) : Memory.DWord(r3),
 
-            // Now execute Cpuid instruction
-            c.Emit(InstructionId.Cpuid, eax, ebx, ecx, edx);
+                // Now execute Cpuid instruction
+                InstructionId.Cpuid, eax, ebx, ecx, edx,
 
-            // Load result back into arguments addresses
-            // *r0 = eax
-            c.Emit(InstructionId.Mov, X64 ? Memory.QWord(r0) : Memory.DWord(r0), eax);
-            // *r1 = ebx
-            c.Emit(InstructionId.Mov, X64 ? Memory.QWord(r1) : Memory.DWord(r1), ebx);
-            // *r2 = ecx
-            c.Emit(InstructionId.Mov, X64 ? Memory.QWord(r2) : Memory.DWord(r2), ecx);
-            // *r3 = eadx
-            c.Emit(InstructionId.Mov, X64 ? Memory.QWord(r3) : Memory.DWord(r3), edx);
+                // Load result back into arguments addresses
+                // *r0 = eax
+                InstructionId.Mov, X64 ? Memory.QWord(r0) : Memory.DWord(r0), eax,
+                // *r1 = ebx
+                InstructionId.Mov, X64 ? Memory.QWord(r1) : Memory.DWord(r1), ebx,
+                // *r2 = ecx
+                InstructionId.Mov, X64 ? Memory.QWord(r2) : Memory.DWord(r2), ecx,
+                // *r3 = eadx
+                InstructionId.Mov, X64 ? Memory.QWord(r3) : Memory.DWord(r3), edx);
 
             // End return out of here :)
             c.Ret();

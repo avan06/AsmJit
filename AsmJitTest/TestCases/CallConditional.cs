@@ -1,7 +1,8 @@
 using System;
-using AsmJit.Common;
+using AsmJit.Common.Enums;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
+using AsmJit.CompilerContext.CodeTree;
 
 namespace AsmJitTest.TestCases
 {
@@ -57,13 +58,13 @@ namespace AsmJitTest.TestCases
             c.Ret(result);
 
             c.Bind(opAdd);
-            var call = c.Call(Memory.Fn(new Func<int, int, int>(CalledFunctionAdd)));
+            var call = c.Call(FnPointer.Fn(new Func<int, int, int>(CalledFunctionAdd)));
             call.SetArgument(x, y);
             var result_1 = call.SetReturn(c.Int32("result_1"));
             c.Ret(result_1);
 
             c.Bind(opMul);
-            call = c.Call(Memory.Fn(new Func<int, int, int>(CalledFunctionMul)));
+            call = c.Call(FnPointer.Fn(new Func<int, int, int>(CalledFunctionMul)));
             call.SetArgument(x, y);
             var result_2 = call.SetReturn(c.Int32("result_2"));
             c.Ret(result_2);

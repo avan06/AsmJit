@@ -1,5 +1,5 @@
-﻿using System.ComponentModel;
-using AsmJit.CompilerContext;
+﻿using AsmJit.Common.Enums;
+using System.ComponentModel;
 
 namespace AsmJit.Common
 {

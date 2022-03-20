@@ -1,7 +1,8 @@
 using System;
-using AsmJit.Common;
+using AsmJit.Common.Enums;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
+using AsmJit.CompilerContext.CodeTree;
 
 namespace AsmJitTest.TestCases
 {
@@ -21,19 +22,20 @@ namespace AsmJitTest.TestCases
             var vi = c.Int32("vi");
             var vj = c.Int32("vj");
 
-            var fp = Memory.Fn(new Func<int, int, int, int, int, int, int, int, int, int, int>(CalledFunction));
+            var fp = FnPointer.Fn(new Func<int, int, int, int, int, int, int, int, int, int, int>(CalledFunction));
 
-            c.Emit(InstructionId.Mov, fn, fp);
-            c.Emit(InstructionId.Mov, va, (Immediate)0x03);
-            c.Emit(InstructionId.Mov, vb, (Immediate)0x12);
-            c.Emit(InstructionId.Mov, vc, (Immediate)0xA0);
-            c.Emit(InstructionId.Mov, vd, (Immediate)0x0B);
-            c.Emit(InstructionId.Mov, ve, (Immediate)0x2F);
-            c.Emit(InstructionId.Mov, vf, (Immediate)0x02);
-            c.Emit(InstructionId.Mov, vg, (Immediate)0x0C);
-            c.Emit(InstructionId.Mov, vh, (Immediate)0x12);
-            c.Emit(InstructionId.Mov, vi, (Immediate)0x18);
-            c.Emit(InstructionId.Mov, vj, (Immediate)0x1E);
+            c.Emit(
+                InstructionId.Mov, fn, fp,
+                InstructionId.Mov, va, (Immediate)0x03,
+                InstructionId.Mov, vb, (Immediate)0x12,
+                InstructionId.Mov, vc, (Immediate)0xA0,
+                InstructionId.Mov, vd, (Immediate)0x0B,
+                InstructionId.Mov, ve, (Immediate)0x2F,
+                InstructionId.Mov, vf, (Immediate)0x02,
+                InstructionId.Mov, vg, (Immediate)0x0C,
+                InstructionId.Mov, vh, (Immediate)0x12,
+                InstructionId.Mov, vi, (Immediate)0x18,
+                InstructionId.Mov, vj, (Immediate)0x1E);
 
             var call = c.Call(fn, fp);
             call.SetArgument(va, vb, vc, vd, ve, vf, vg, vh, vi, vj);

@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common;
+using AsmJit.Common.Enums;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 
@@ -31,10 +31,11 @@ namespace AsmJitTest.TestCases
             for (i = 2; i < Cnt; i++)
             {
                 // Add and truncate to 8 bit; no purpose, just mess with jit.
-                c.Emit(InstructionId.Add, rVar[i], rVar[i - 1]);
-                c.Emit(InstructionId.Movzx, rVar[i], rVar[i].As8());
-                c.Emit(InstructionId.Movzx, rVar[i - 2], rVar[i - 1].As8());
-                c.Emit(InstructionId.Movzx, rVar[i - 1], rVar[i - 2].As8());
+                c.Emit(
+                    InstructionId.Add, rVar[i], rVar[i - 1],
+                    InstructionId.Movzx, rVar[i], rVar[i].As8(),
+                    InstructionId.Movzx, rVar[i - 2], rVar[i - 1].As8(),
+                    InstructionId.Movzx, rVar[i - 1], rVar[i - 2].As8());
             }
 
             // Sum up all computed values.

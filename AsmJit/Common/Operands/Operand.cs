@@ -2,6 +2,9 @@
 {
     public abstract class Operand
     {
+        public static readonly Invalid Invalid = new Invalid();
+        protected internal readonly OperandType OperandType;
+
         protected Operand(OperandType type)
         {
             Id = Constants.InvalidId;
@@ -26,8 +29,6 @@
             Reserved3 = other.Reserved3;
         }
 
-        protected internal OperandType OperandType { get; protected set; }
-
         protected internal int Size { get; protected set; }
 
         protected internal int Reserved0 { get; protected set; }
@@ -39,8 +40,6 @@
         protected internal int Reserved2 { get; protected set; }
 
         protected internal int Reserved3 { get; protected set; }
-
-        public static Invalid Invalid => new Invalid();
 
         internal virtual T As<T>() where T : Operand => this as T;
 

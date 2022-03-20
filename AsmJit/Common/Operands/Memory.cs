@@ -1,4 +1,5 @@
 using System;
+using AsmJit.Common.Extensions;
 
 namespace AsmJit.Common.Operands
 {
@@ -261,30 +262,54 @@ namespace AsmJit.Common.Operands
             set => Flags = (int)((Flags & Constants.X86.MemShiftMask) + (value << Constants.X86.MemShiftIndex));
         }
 
-        public bool HasSegment
-        {
-            get => (Flags & Constants.X86.MemSegMask) != Constants.X86.SegDefault << Constants.X86.MemSegIndex;
-        }
+        public bool HasSegment => (Flags & Constants.X86.MemSegMask) != Constants.X86.SegDefault << Constants.X86.MemSegIndex;
 
         public bool HasGdpBase => (Flags & Constants.X86.MemGpdMask) != 0;
 
-        public static FnPointer Fn(Delegate d, CallingConvention convention = CallingConvention.Default) => new FnPointer(d, convention);
-
-        public static FnPointer Fn<T>(Pointer fnPtr, CallingConvention convention = CallingConvention.Default) => new FnPointer<T>(fnPtr, convention);
-
+        /// <summary>
+        /// Creates `[base.reg + offset]` memory operand.
+        /// </summary>
         internal static Memory Ptr(GpRegister @base, int disp = 0, int size = 0) => new Memory(@base, disp, size);
 
+        /// <summary>
+        /// Creates `[base.reg + (index << shift) + offset]` memory operand (scalar index).
+        /// </summary>
         internal static Memory Ptr(GpRegister @base, GpRegister index, int shift = 0, int disp = 0, int size = 0) => new Memory(@base, index, shift, disp, size);
 
+        /// <summary>
+        /// Creates `[base.reg + (index << shift) + offset]` memory operand (vector index).
+        /// </summary>
         internal static Memory Ptr(GpRegister @base, XmmRegister index, int shift = 0, int disp = 0, int size = 0) => new Memory(@base, index, shift, disp, size);
 
+        /// <summary>
+        /// Creates `[base.reg + (index << shift) + offset]` memory operand (vector index).
+        /// </summary>
         internal static Memory Ptr(GpRegister @base, YmmRegister index, int shift = 0, int disp = 0, int size = 0) => new Memory(@base, index, shift, disp, size);
 
+        /// <summary>
+        /// Creates `[base + offset]` memory operand.
+        /// </summary>
         public static Memory Ptr(Label label, int disp = 0, int size = 0) => new Memory(label, disp, size);
 
+        /// <summary>
+        /// Creates `[base + (index << shift) + offset]` memory operand.
+        /// </summary>
         public static Memory Ptr(Label label, GpRegister index, int shift, int disp = 0, int size = 0) => new Memory(label, index, shift, disp, size);
 
+        /// <summary>
+        /// Creates `[rip + offset]` memory operand.
+        /// </summary>
         internal static Memory Ptr(RipRegister rip, int disp = 0, int size = 0) => new Memory(rip, disp, size);
+
+        /// <summary>
+        /// Creates `[base]` absolute memory operand.
+        /// </summary>
+        internal static Memory Ptr(long @base, int size = 0)
+        {
+            IntPtr pAbs = (IntPtr)(@base >> 32);
+            int disp = (int)(@base & 0xFFFFFFFFu);
+            return PtrAbs(pAbs, disp, size);
+        }
 
         public static Memory Ptr(GpVariable @base, int disp = 0, int size = 0) => new Memory(@base, disp, size);
 

@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using AsmJit.Common;
+using AsmJit.Common.Enums;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 
@@ -104,10 +105,11 @@ namespace AsmJitTest.TestCases
             //175 01 01                          add [rcx], eax
             //177 01 80 00 80 00 80              add [rax-0x7fff8000], eax
             //17d 00 80 00                       invalid
-            var dst = c.SetArgument(c.IntPtr("dst")); //mov [rsp-0x40], rdx
-            var src = c.SetArgument(c.IntPtr("src"));
+            var dst = c.IntPtr("dst"); //mov [rsp-0x40], rdx
+            var src = c.IntPtr("src");
+            var idx = c.IntPtr("idx"); //mov [rsp-0x48], r8
 
-            var i = c.SetArgument(c.IntPtr("i")); //mov [rsp-0x48], r8
+
             var j = c.IntPtr("j"); //mov [rsp-0x38], rcx
             var t = c.IntPtr("t");
 
@@ -129,121 +131,122 @@ namespace AsmJitTest.TestCases
 
             var data = c.Label();
 
-            //c.SetArgument(dst);
-            //c.SetArgument(src);
-            //c.SetArgument(i);
+            c.SetArgument(dst, src, idx);
 
             c.Allocate(dst);
             c.Allocate(src);
-            c.Allocate(i);
+            c.Allocate(idx);
 
             // How many pixels have to be processed to make the loop aligned.
-            c.Emit(InstructionId.Lea, t, Memory.Ptr(data)); //lea rax, [rip+0x140]
-            c.Emit(InstructionId.Xor, j, j); //xor rcx, rcx
-            c.Emit(InstructionId.Xorps, cZero, cZero); //xorps xmm0, xmm0
+            c.Emit(
+                InstructionId.Lea, t, Memory.Ptr(data),
+                InstructionId.Xor, j, j,
+                InstructionId.Xorps, cZero, cZero,
 
-            c.Emit(InstructionId.Sub, j, dst); //mov rdx, [rsp-0x38]; sub rcx, rdx
-            c.Emit(InstructionId.Movaps, cMul255A, Memory.Ptr(t, 0)); //movaps xmm1, [rax]
+                InstructionId.Sub, j, dst,
+                InstructionId.Movaps, cMul255A, Memory.Ptr(t, 0),
 
-            c.Emit(InstructionId.And, j, (Immediate)15); //and rcx, 0xf
-            c.Emit(InstructionId.Movaps, cMul255M, Memory.Ptr(t, 16)); //movaps xmm2, [rax+0x10]
+                InstructionId.And, j, (Immediate)15,
+                InstructionId.Movaps, cMul255M, Memory.Ptr(t, 16),
 
-            c.Emit(InstructionId.Shr, j, (Immediate)2); //shr rcx, 0x2
-            c.Emit(InstructionId.Jz, smallEnd); //jz 0x1d3f9040150
+                InstructionId.Shr, j, (Immediate)2,
+                InstructionId.Jz, smallEnd,
 
-            // j = min(i, j).
-            c.Emit(InstructionId.Cmp, j, i); //mov r8, [rsp-0x48];cmp rcx, r8
-            c.Emit(InstructionId.Cmovg, j, i); //cmovg rcx, r8
+                // j = min(i, j).
+                InstructionId.Cmp, j, idx,
+                InstructionId.Cmovg, j, idx,
 
-            // i -= j.
-            c.Emit(InstructionId.Sub, i, j); //sub r8, rcx
+                // i -= j.
+                InstructionId.Sub, idx, j);
 
             // Small loop.
             c.Bind(smallLoop);
 
-            c.Emit(InstructionId.Pcmpeqb, a0, a0); //pcmpeqb xmm3, xmm3
-            c.Emit(InstructionId.Movd, y0, Memory.Ptr(src)); //mov rax, [rsp-0x40];movd xmm4, dword [rax]
+            c.Emit(
+                InstructionId.Pcmpeqb, a0, a0,
+                InstructionId.Movd, y0, Memory.Ptr(src),
 
-            c.Emit(InstructionId.Pxor, a0, y0); //pxor xmm3, xmm4
-            c.Emit(InstructionId.Movd, x0, Memory.Ptr(dst)); //movd xmm5, dword [rdx]
+                InstructionId.Pxor, a0, y0,
+                InstructionId.Movd, x0, Memory.Ptr(dst),
 
-            c.Emit(InstructionId.Psrlw, a0, (Immediate)8); //psrlw xmm3, 0x8
-            c.Emit(InstructionId.Punpcklbw, x0, cZero); //punpcklbw xmm5, xmm0
+                InstructionId.Psrlw, a0, (Immediate)8,
+                InstructionId.Punpcklbw, x0, cZero,
 
-            c.Emit(InstructionId.Pshuflw, a0, a0, (Immediate)Utils.Shuffle(1, 1, 1, 1)); //pshuflw xmm3, xmm3, 0x55
-            c.Emit(InstructionId.Punpcklbw, y0, cZero); //punpcklbw xmm4, xmm0
+                InstructionId.Pshuflw, a0, a0, (Immediate)Utils.Shuffle(1, 1, 1, 1),
+                InstructionId.Punpcklbw, y0, cZero,
 
-            c.Emit(InstructionId.Pmullw, x0, a0); //pmullw xmm5, xmm3
-            c.Emit(InstructionId.Paddsw, x0, cMul255A); //paddsw xmm5, xmm1
-            c.Emit(InstructionId.Pmulhuw, x0, cMul255M); //pmulhuw xmm5, xmm2
+                InstructionId.Pmullw, x0, a0,
+                InstructionId.Paddsw, x0, cMul255A,
+                InstructionId.Pmulhuw, x0, cMul255M,
 
-            c.Emit(InstructionId.Paddw, x0, y0); //paddw xmm5, xmm4
-            c.Emit(InstructionId.Packuswb, x0, x0); //packuswb xmm5, xmm5
+                InstructionId.Paddw, x0, y0,
+                InstructionId.Packuswb, x0, x0,
 
-            c.Emit(InstructionId.Movd, Memory.Ptr(dst), x0); //movd [rdx], xmm5
+                InstructionId.Movd, Memory.Ptr(dst), x0,
 
-            c.Emit(InstructionId.Add, dst, (Immediate)4); //add rdx, 0x4
-            c.Emit(InstructionId.Add, src, (Immediate)4); //add rax, 0x4
+                InstructionId.Add, dst, (Immediate)4,
+                InstructionId.Add, src, (Immediate)4,
 
-            c.Emit(InstructionId.Dec, j); //dec rcx
-            c.Emit(InstructionId.Jnz, smallLoop); //jnz 0x000132
+                InstructionId.Dec, j,
+                InstructionId.Jnz, smallLoop);
 
             // Second section, prepare for an aligned loop.
             c.Bind(smallEnd);
+            c.Emit(
+                InstructionId.Test, idx, idx,
+                InstructionId.Mov, j, idx,
+                InstructionId.Jz, c.Exit,
 
-            c.Emit(InstructionId.Test, i, i); //test r8, r8
-            c.Emit(InstructionId.Mov, j, i); //mov rcx, r8
-            c.Emit(InstructionId.Jz, c.Exit); //jz 0x000127
-
-            c.Emit(InstructionId.And, j, (Immediate)3); //and rcx, 0x3
-            c.Emit(InstructionId.Shr, i, (Immediate)2); //shr r8, 0x2
-            c.Emit(InstructionId.Jz, largeEnd); //jz 0x00011e
+                InstructionId.And, j, (Immediate)3,
+                InstructionId.Shr, idx, (Immediate)2,
+                InstructionId.Jz, largeEnd);
 
             // Aligned loop.
             c.Bind(largeLoop);
+            c.Emit(
+                InstructionId.Movups, y0, Memory.Ptr(src),
+                InstructionId.Pcmpeqb, a0, a0,
+                InstructionId.Movaps, x0, Memory.Ptr(dst),
 
-            c.Emit(InstructionId.Movups, y0, Memory.Ptr(src)); //movups xmm4, [rax]
-            c.Emit(InstructionId.Pcmpeqb, a0, a0); //pcmpeqb xmm3, xmm3
-            c.Emit(InstructionId.Movaps, x0, Memory.Ptr(dst)); //movaps xmm5, [rdx]
+                InstructionId.Xorps, a0, y0,
+                InstructionId.Movaps, x1, x0,
 
-            c.Emit(InstructionId.Xorps, a0, y0); //xorps xmm3, xmm4
-            c.Emit(InstructionId.Movaps, x1, x0); //movaps xmm6, xmm5
+                InstructionId.Psrlw, a0, (Immediate)8,
+                InstructionId.Punpcklbw, x0, cZero,
 
-            c.Emit(InstructionId.Psrlw, a0, (Immediate)8); //psrlw xmm3, 0x8
-            c.Emit(InstructionId.Punpcklbw, x0, cZero); //punpcklbw xmm5, xmm0
+                InstructionId.Movaps, a1, a0,
+                InstructionId.Punpcklwd, a0, a0,
 
-            c.Emit(InstructionId.Movaps, a1, a0); //movaps xmm7, xmm3
-            c.Emit(InstructionId.Punpcklwd, a0, a0); //punpcklwd xmm3, xmm3
+                InstructionId.Punpckhbw, x1, cZero,
+                InstructionId.Punpckhwd, a1, a1,
 
-            c.Emit(InstructionId.Punpckhbw, x1, cZero); //punpckhbw xmm6, xmm0
-            c.Emit(InstructionId.Punpckhwd, a1, a1); //punpckhwd xmm7, xmm7
+                InstructionId.Pshufd, a0, a0, (Immediate)Utils.Shuffle(3, 3, 1, 1),
+                InstructionId.Pshufd, a1, a1, (Immediate)Utils.Shuffle(3, 3, 1, 1),
+                
+                InstructionId.Pmullw, x0, a0,
+                InstructionId.Pmullw, x1, a1,
 
-            c.Emit(InstructionId.Pshufd, a0, a0, (Immediate)Utils.Shuffle(3, 3, 1, 1)); //pshufd xmm3, xmm3, 0xf5
-            c.Emit(InstructionId.Pshufd, a1, a1, (Immediate)Utils.Shuffle(3, 3, 1, 1)); //pshufd xmm7, xmm7, 0xf5
+                InstructionId.Paddsw, x0, cMul255A,
+                InstructionId.Paddsw, x1, cMul255A,
 
-            c.Emit(InstructionId.Pmullw, x0, a0); //pmullw xmm5, xmm3
-            c.Emit(InstructionId.Pmullw, x1, a1); //pmullw xmm6, xmm7
+                InstructionId.Pmulhuw, x0, cMul255M,
+                InstructionId.Pmulhuw, x1, cMul255M,
 
-            c.Emit(InstructionId.Paddsw, x0, cMul255A); //paddsw xmm5, xmm1
-            c.Emit(InstructionId.Paddsw, x1, cMul255A); //paddsw xmm6, xmm1
+                InstructionId.Add, src, (Immediate)16,
+                InstructionId.Packuswb, x0, x1,
 
-            c.Emit(InstructionId.Pmulhuw, x0, cMul255M); //pmulhuw xmm5, xmm2
-            c.Emit(InstructionId.Pmulhuw, x1, cMul255M); //pmulhuw xmm6, xmm2
+                InstructionId.Paddw, x0, y0,
+                InstructionId.Movaps, Memory.Ptr(dst), x0,
 
-            c.Emit(InstructionId.Add, src, (Immediate)16); //add rax, 0x10
-            c.Emit(InstructionId.Packuswb, x0, x1); //packuswb xmm5, xmm6
+                InstructionId.Add, dst, (Immediate)16,
 
-            c.Emit(InstructionId.Paddw, x0, y0); //paddw xmm5, xmm4
-            c.Emit(InstructionId.Movaps, Memory.Ptr(dst), x0); //movaps [rdx], xmm5
-
-            c.Emit(InstructionId.Add, dst, (Immediate)16); //add rdx, 0x10
-
-            c.Emit(InstructionId.Dec, i); //dec r8
-            c.Emit(InstructionId.Jnz, largeLoop); //jnz 0x0000bc
+                InstructionId.Dec, idx,
+                InstructionId.Jnz, largeLoop);
 
             c.Bind(largeEnd);
-            c.Emit(InstructionId.Test, j, j); //test rcx, rcx
-            c.Emit(InstructionId.Jnz, smallLoop); //jnz 0x000141
+            c.Emit(
+                InstructionId.Test, j, j,
+                InstructionId.Jnz, smallLoop);
 
             // Data
             c.Data(data, 16, 
@@ -283,12 +286,12 @@ namespace AsmJitTest.TestCases
             expected = string.Join(",", e);
         }
 
-        private static uint BlendSrcOver(uint d, uint s)
+        private static uint BlendSrcOver(uint dst, uint src)
         {
-            var saInv = ~s >> 24;
+            var saInv = ~src >> 24;
 
-            var d20 = (d) & 0x00FF00FF;
-            var d31 = (d >> 8) & 0x00FF00FF;
+            var d20 = (dst) & 0x00FF00FF;
+            var d31 = (dst >> 8) & 0x00FF00FF;
 
             d20 *= saInv;
             d31 *= saInv;
@@ -296,7 +299,7 @@ namespace AsmJitTest.TestCases
             d20 = ((d20 + ((d20 >> 8) & 0x00FF00FFU) + 0x00800080U) & 0xFF00FF00U) >> 8;
             d31 = ((d31 + ((d31 >> 8) & 0x00FF00FFU) + 0x00800080U) & 0xFF00FF00U);
 
-            return d20 + d31 + s;
+            return d20 + d31 + src;
         }
     }
 }

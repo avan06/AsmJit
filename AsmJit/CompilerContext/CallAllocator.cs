@@ -1,7 +1,9 @@
 ﻿using System;
-using AsmJit.AssemblerContext;
 using AsmJit.Common;
+using AsmJit.Common.Enums;
+using AsmJit.Common.Extensions;
 using AsmJit.Common.Operands;
+using AsmJit.Common.Variables;
 using AsmJit.CompilerContext.CodeTree;
 
 namespace AsmJit.CompilerContext
@@ -11,7 +13,7 @@ namespace AsmJit.CompilerContext
         private RegisterMask _willAlloc = new RegisterMask();
         private RegisterMask _willSpill = new RegisterMask();
 
-        public CallAllocator(Assembler assembler, Compiler compiler, CodeContext codeContext, Translator translator, VariableContext ctx) : base(assembler, compiler, codeContext, translator, ctx) { }
+        public CallAllocator(Compiler compiler, CodeContext codeContext, Translator translator, VariableContext ctx) : base(compiler, codeContext, translator, ctx) { }
 
         private void InitImpl(CallNode node, VariableMap map)
         {
@@ -66,7 +68,7 @@ namespace AsmJit.CompilerContext
             Compiler.SetCurrentNode(node);
 
             var decl = node.FunctionDeclaration;
-            if (decl.CalleePopsStack && decl.ArgumentsStackSize != 0) Compiler.Emit(InstructionId.Sub, Assembler.Zsp, (Immediate)decl.ArgumentsStackSize);
+            if (decl.CalleePopsStack && decl.ArgumentsStackSize != 0) Compiler.Emit(InstructionId.Sub, Cpu.Zsp, (Immediate)decl.ArgumentsStackSize);
 
             // Clobber.
             Clobber(RegisterClass.Gp);
@@ -85,16 +87,16 @@ namespace AsmJit.CompilerContext
             Cleanup();
         }
 
-        private void Plan(RegisterClass @class)
+        private void Plan(RegisterClass rClass)
         {
             int i;
-            var clobbered = Map.ClobberedRegs.Get(@class);
+            var clobbered = Map.ClobberedRegs.Get(rClass);
 
-            var willAlloc = _willAlloc.Get(@class);
+            var willAlloc = _willAlloc.Get(rClass);
             var willFree = clobbered & ~willAlloc;
 
-            var list = VaList[(int)@class];
-            var count = Count.Get(@class);
+            var list = VaList[(int)rClass];
+            var count = Count.Get(rClass);
 
             var state = VariableContext.State;
             // Calculate 'willAlloc' and 'willFree' masks based on mandatory masks.
@@ -124,7 +126,7 @@ namespace AsmJit.CompilerContext
                     {
                         va.InRegIndex = regIndex;
                         va.Flags |= VariableFlags.AllocRDone;
-                        Done.Add(@class);
+                        Done.Add(rClass);
                     }
                     else willFree |= regMask;
                 }
@@ -135,7 +137,7 @@ namespace AsmJit.CompilerContext
                     else
                     {
                         va.Flags |= VariableFlags.AllocRDone;
-                        Done.Add(@class);
+                        Done.Add(rClass);
                     }
                 }
             }
@@ -143,7 +145,7 @@ namespace AsmJit.CompilerContext
             // Occupied registers without 'willFree' registers; contains basically
             // all the registers we can use to allocate variables without inRegs
             // speficied.
-            var occupied = state.Occupied.Get(@class) & ~willFree;
+            var occupied = state.Occupied.Get(rClass) & ~willFree;
             var willSpill = 0;
 
             // Find the best registers for variables that are not allocated yet. Only
@@ -158,7 +160,7 @@ namespace AsmJit.CompilerContext
 
                 // All registers except Gp used by call itself must have inRegIndex.
                 var m = va.InRegs;
-                if (@class != RegisterClass.Gp || m != 0)
+                if (rClass != RegisterClass.Gp || m != 0)
                 {
                     if (!(m != 0)) { throw new ArgumentException(); }
                     va.InRegIndex = m.FindFirstBit();
@@ -167,13 +169,13 @@ namespace AsmJit.CompilerContext
                 }
 
                 m = va.AllocableRegs & ~(willAlloc ^ m);
-                m = GuessAlloc(@class, vd, m);
+                m = GuessAlloc(rClass, vd, m);
                 if (!(m != 0)) { throw new ArgumentException(); }
 
                 var candidateRegs = m & ~occupied;
                 if (candidateRegs == 0)
                 {
-                    candidateRegs = m & occupied & ~state.Modified.Get(@class);
+                    candidateRegs = m & occupied & ~state.Modified.Get(rClass);
                     if (candidateRegs == 0) candidateRegs = m;
                 }
 
@@ -193,22 +195,22 @@ namespace AsmJit.CompilerContext
             }
 
             // Set calculated masks back to the allocator; needed by spill() and alloc().
-            _willSpill.Set(@class, willSpill);
-            _willAlloc.Set(@class, willAlloc);
+            _willSpill.Set(rClass, willSpill);
+            _willAlloc.Set(rClass, willAlloc);
         }
 
-        private void Spill(RegisterClass @class)
+        private void Spill(RegisterClass rClass)
         {
-            var m = _willSpill.Get(@class);
+            var m = _willSpill.Get(rClass);
             var i = -1;
 
             if (m == 0) return;
 
             var state = VariableContext.State;
-            var sVars = state.GetListByClass(@class);
+            var sVars = state.GetListByClass(rClass);
 
             // Available registers for decision if move has any benefit over spill.
-            var availableRegs = VariableContext.GaRegs[@class] & ~(state.Occupied.Get(@class) | m | _willAlloc.Get(@class));
+            var availableRegs = VariableContext.GaRegs[rClass] & ~(state.Occupied.Get(rClass) | m | _willAlloc.Get(rClass));
 
             do
             {
@@ -224,30 +226,30 @@ namespace AsmJit.CompilerContext
 
                 if (vd.IsModified && availableRegs != 0)
                 {
-                    var available = GuessSpill(@class, vd, availableRegs);
+                    var available = GuessSpill(rClass, vd, availableRegs);
                     if (available != 0)
                     {
                         var regIndex = available.FindFirstBit();
                         var regMask = Utils.Mask(regIndex);
 
-                        Translator.Move(vd, @class, regIndex);
+                        Translator.Move(vd, rClass, regIndex);
                         availableRegs ^= regMask;
                         continue;
                     }
                 }
 
-                Translator.Spill(vd, @class);
+                Translator.Spill(vd, rClass);
             } while (m != 0);
         }
 
-        private void Alloc(RegisterClass @class)
+        private void Alloc(RegisterClass rClass)
         {
-            if (Done.Get(@class) == Count.Get(@class)) return;
-            var list = VaList[(int)@class];
-            var count = Count.Get(@class);
+            if (Done.Get(rClass) == Count.Get(rClass)) return;
+            var list = VaList[(int)rClass];
+            var count = Count.Get(rClass);
 
             var state = VariableContext.State;
-            //var sVars = state.GetListByClass(@class);
+            //var sVars = state.GetListByClass(rClass);
 
             bool didWork;
 
@@ -268,7 +270,7 @@ namespace AsmJit.CompilerContext
                     // Shouldn't be the same.
                     if (aIndex == bIndex) throw new ArgumentException();
 
-                    var bVd = state.GetListByClass(@class)[bIndex];
+                    var bVd = state.GetListByClass(rClass)[bIndex];
                     if (bVd != null)
                     {
                         var bVa = bVd.Attributes;
@@ -277,38 +279,38 @@ namespace AsmJit.CompilerContext
                         // allocation tasks by a single 'xchg' instruction, swapping
                         // two registers required by the instruction/node or one register
                         // required with another non-required.
-                        if (@class != RegisterClass.Gp) continue;
+                        if (rClass != RegisterClass.Gp) continue;
                         Translator.SwapGp(aVd, bVd);
 
                         aVa.Flags |= VariableFlags.AllocRDone;
-                        Done.Add(@class);
+                        Done.Add(rClass);
 
                         // Doublehit, two registers allocated by a single swap.
                         if (bVa != null && bVa.InRegIndex == aIndex)
                         {
                             bVa.Flags |= VariableFlags.AllocRDone;
-                            Done.Add(@class);
+                            Done.Add(rClass);
                         }
 
                         didWork = true;
                     }
                     else if (aIndex != RegisterIndex.Invalid)
                     {
-                        Translator.Move(aVd, @class, bIndex);
-                        VariableContext.ClobberedRegs.Or(@class, Utils.Mask(bIndex));
+                        Translator.Move(aVd, rClass, bIndex);
+                        VariableContext.ClobberedRegs.Or(rClass, Utils.Mask(bIndex));
 
                         aVa.Flags |= VariableFlags.AllocRDone;
-                        Done.Add(@class);
+                        Done.Add(rClass);
 
                         didWork = true;
                     }
                     else
                     {
-                        Translator.Alloc(aVd, @class, bIndex);
-                        VariableContext.ClobberedRegs.Or(@class, Utils.Mask(bIndex));
+                        Translator.Alloc(aVd, rClass, bIndex);
+                        VariableContext.ClobberedRegs.Or(rClass, Utils.Mask(bIndex));
 
                         aVa.Flags |= VariableFlags.AllocRDone;
-                        Done.Add(@class);
+                        Done.Add(rClass);
 
                         didWork = true;
                     }
@@ -317,10 +319,10 @@ namespace AsmJit.CompilerContext
             while (didWork);
         }
 
-        private void Duplicate(RegisterClass @class)
+        private void Duplicate(RegisterClass rClass)
         {
-            var list = VaList[(int)@class];
-            var count = Count.Get(@class);
+            var list = VaList[(int)rClass];
+            var count = Count.Get(rClass);
 
             for (var i = 0; i < count; i++)
             {
@@ -343,19 +345,19 @@ namespace AsmJit.CompilerContext
                     if (inRegs.IsSet(0x1))
                     {
                         Translator.EmitMove(vd, dupIndex, regIndex);
-                        VariableContext.ClobberedRegs.Or(@class, Utils.Mask(dupIndex));
+                        VariableContext.ClobberedRegs.Or(rClass, Utils.Mask(dupIndex));
                     }
                 }
             }
         }
 
-        private void Save(RegisterClass @class)
+        private void Save(RegisterClass rClass)
         {
             var state = VariableContext.State;
-            var sVars = state.GetListByClass(@class);
+            var sVars = state.GetListByClass(rClass);
 
             int i;
-            var affected = Map.ClobberedRegs.Get(@class) & state.Occupied.Get(@class) & state.Modified.Get(@class);
+            var affected = Map.ClobberedRegs.Get(rClass) & state.Occupied.Get(rClass) & state.Modified.Get(rClass);
 
             for (i = 0; affected != 0; i++, affected >>= 1)
             {
@@ -364,7 +366,7 @@ namespace AsmJit.CompilerContext
                 if (vd == null || !vd.IsModified) throw new ArgumentException();
 
                 var va = vd.Attributes;
-                if (va == null || (va.Flags & (VariableFlags.WReg | VariableFlags.Unuse)) == 0) Translator.Save(vd, @class);
+                if (va == null || (va.Flags & (VariableFlags.WReg | VariableFlags.Unuse)) == 0) Translator.Save(vd, rClass);
             }
         }
 
@@ -388,20 +390,20 @@ namespace AsmJit.CompilerContext
 
                 if (arg.StackOffset != Constants.InvalidValue)
                 {
-                    var dst = new Memory(Assembler.Zsp, -Cpu.Info.RegisterSize + arg.StackOffset);
+                    var dst = new Memory(Cpu.Zsp, -Cpu.Info.RegisterSize + arg.StackOffset);
                     Translator.EmitMoveImmOnStack(varType, dst, imm);
                 }
                 else Translator.EmitMoveImmToReg(varType, arg.RegisterIndex, imm);
             }
         }
 
-        private void Clobber(RegisterClass @class)
+        private void Clobber(RegisterClass rClass)
         {
             var state = VariableContext.State;
-            var sVars = state.GetListByClass(@class);
+            var sVars = state.GetListByClass(rClass);
 
             int i;
-            var affected = Map.ClobberedRegs.Get(@class) & state.Occupied.Get(@class);
+            var affected = Map.ClobberedRegs.Get(rClass) & state.Occupied.Get(rClass);
 
             for (i = 0; affected != 0; i++, affected >>= 1)
             {
@@ -414,7 +416,7 @@ namespace AsmJit.CompilerContext
 
                 if (!vd.IsModified || (va != null && (va.Flags & (VariableFlags.WAll | VariableFlags.Unuse)) != 0)) vdState = VariableUsage.Mem;
 
-                Translator.Unuse(vd, @class, vdState);
+                Translator.Unuse(vd, rClass, vdState);
             }
         }
 
@@ -472,20 +474,20 @@ namespace AsmJit.CompilerContext
             }
         }
 
-        private void UnuseAfter(RegisterClass @class)
+        private void UnuseAfter(RegisterClass rClass)
         {
-            var list = VaList[(int)@class];
-            var count = Count.Get(@class);
+            var list = VaList[(int)rClass];
+            var count = Count.Get(rClass);
 
             for (var i = 0; i < count; i++)
             {
                 var va = list[i];
 
-                if ((va.Flags & VariableFlags.Unuse) != 0) Translator.Unuse(va.VariableData, @class);
+                if ((va.Flags & VariableFlags.Unuse) != 0) Translator.Unuse(va.VariableData, rClass);
             }
         }
 
-        private int GuessAlloc(RegisterClass @class, VariableData vd, int allocableRegs)
+        private int GuessAlloc(RegisterClass rClass, VariableData vd, int allocableRegs)
         {
             if (allocableRegs == 0) throw new ArgumentException();
             if (allocableRegs.IsPowerOf2()) return allocableRegs;
@@ -493,7 +495,7 @@ namespace AsmJit.CompilerContext
             var safeRegs = allocableRegs;
             var node = Node;
 
-            for (var j = 0; j < Assembler.MaxLookAhead; j++)
+            for (var j = 0; j < MaxLookAhead; j++)
             {
                 if (node.Flags.IsSet(CodeNodeFlags.Ret) || node.Flags.IsSet(CodeNodeFlags.Jcc)) break;
                 if (node.Flags.IsSet(CodeNodeFlags.Jmp))
@@ -505,7 +507,7 @@ namespace AsmJit.CompilerContext
                 if (node == null) throw new ArgumentException();
                 var map = node.VariableMap;
                 if (map == null) continue;
-                var va = map.FindAttributesByClass(@class, vd);
+                var va = map.FindAttributesByClass(rClass, vd);
                 if (va != null)
                 {
                     var inRegs = va.InRegs;
@@ -519,14 +521,14 @@ namespace AsmJit.CompilerContext
                 }
 
                 safeRegs = allocableRegs;
-                allocableRegs &= ~(map.InRegs.Get(@class) | map.OutRegs.Get(@class) | map.ClobberedRegs.Get(@class));
+                allocableRegs &= ~(map.InRegs.Get(rClass) | map.OutRegs.Get(rClass) | map.ClobberedRegs.Get(rClass));
 
                 if (allocableRegs == 0) break;
             }
             return safeRegs;
         }
 
-        private int GuessSpill(RegisterClass @class, VariableData vd, int allocableRegs)
+        private int GuessSpill(RegisterClass rClass, VariableData vd, int allocableRegs)
         {
             if (allocableRegs == 0) throw new ArgumentException();
             return 0;

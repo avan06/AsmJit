@@ -1,57 +1,13 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using AsmJit.Common;
-using AsmJit.Common.Operands;
+using AsmJit.Common.Extensions;
 
 namespace AsmJit.AssemblerContext
 {
-    public sealed class Assembler
+    public sealed class Assembler : AssemblerBase
     {
-        internal const int MaxLookAhead = 64;
-
-        private static int _idGenerator;
-
-        private List<LabelData> _labels = new List<LabelData>();
-        private AssemblerFeatures _features;
-        private InstructionOptions _instructionOptions;
-        private CodeBuffer _codeBuffer;
-        private int _id;
         private CodeContext _codeContext;
-        private List<DataBlock> _data = new List<DataBlock>();
-
-        internal Assembler()
-        {
-            _codeBuffer = new CodeBuffer(this);
-            _codeContext = new CodeContext(this);
-
-            if (Constants.X64)
-            {
-                Zdi = new GpRegister(Cpu.Registers.Rdi);
-                Zsi = new GpRegister(Cpu.Registers.Rsi);
-                Zbp = new GpRegister(Cpu.Registers.Rbp);
-                Zsp = new GpRegister(Cpu.Registers.Rsp);
-                Zbx = new GpRegister(Cpu.Registers.Rbx);
-                Zdx = new GpRegister(Cpu.Registers.Rdx);
-                Zcx = new GpRegister(Cpu.Registers.Rcx);
-                Zax = new GpRegister(Cpu.Registers.Rax);
-            }
-            else
-            {
-                Zdi = new GpRegister(Cpu.Registers.Edi);
-                Zsi = new GpRegister(Cpu.Registers.Esi);
-                Zbp = new GpRegister(Cpu.Registers.Ebp);
-                Zsp = new GpRegister(Cpu.Registers.Esp);
-                Zbx = new GpRegister(Cpu.Registers.Ebx);
-                Zdx = new GpRegister(Cpu.Registers.Edx);
-                Zcx = new GpRegister(Cpu.Registers.Ecx);
-                Zax = new GpRegister(Cpu.Registers.Eax);
-            }
-
-            _id = _idGenerator++;
-            _features |= AssemblerFeatures.OptimizedAlign;
-            _instructionOptions = InstructionOptions.None;
-        }
 
         public static CodeContext<T> CreateContext<T>()
         {
@@ -73,96 +29,12 @@ namespace AsmJit.AssemblerContext
                 var ret = gargs.Last();
                 delType = DelegateCreator.NewDelegateType(ret, args);
             }
-            else throw new ArgumentException();
+            else throw new ArgumentException(string.Format("unknown type:{0}", t));
+
             var asm = new Assembler();
             var ctx = new CodeContext<T>(asm, delType);
             asm._codeContext = ctx;
             return ctx;
-        }
-
-        internal GpRegister Zax { get; private set; }
-
-        internal GpRegister Zcx { get; private set; }
-
-        internal GpRegister Zdx { get; private set; }
-
-        internal GpRegister Zbx { get; private set; }
-
-        internal GpRegister Zsp { get; private set; }
-
-        internal GpRegister Zbp { get; private set; }
-
-        internal GpRegister Zsi { get; private set; }
-
-        internal GpRegister Zdi { get; private set; }
-
-        internal bool HasFeature(AssemblerFeatures feature) => _features.IsSet(feature);
-
-        internal Pointer BaseAddress { get; set; }
-
-        internal InstructionOptions GetInstructionOptionsAndReset()
-        {
-            var options = _instructionOptions;
-            _instructionOptions = InstructionOptions.None;
-            return options;
-        }
-
-        public void Data(Label label, int alignment, params Data[] data) => _data.Add(new DataBlock(label, alignment, data));
-
-        internal LabelData CreateLabelData(out int id)
-        {
-            var data = new LabelData(_id);
-            id = _labels.Count;
-            _labels.Add(data);
-            return data;
-        }
-
-        internal LabelData GetLabelData(long id) => _labels[(int)id];
-
-        internal void Unfollow() => _instructionOptions |= InstructionOptions.Unfollow;
-
-        internal Label CreateLabel()
-        {
-            int id;
-            CreateLabelData(out id);
-            return new Label(id);
-        }
-
-        internal void Embed(Pointer data, int size) => _codeBuffer.Embed(data, size);
-
-        internal void Align(AligningMode alignMode, int offset) => _codeBuffer.Align(alignMode, offset);
-
-        internal void Bind(int labelId) => _codeBuffer.Bind(labelId);
-
-        internal Pointer Make()
-        {
-            unsafe
-            {
-                foreach (DataBlock dataItem in _data)
-                {
-                    if (dataItem.Label == null) throw new ArgumentException("DataBlock label is null");
-                    Align(AligningMode.Data, dataItem.Alignment);
-                    Bind(dataItem.Label.Id);
-                    foreach (Data v in dataItem.Data)
-                    {
-                        fixed (byte* pv = v.ByteData)
-                        {
-                            Embed(pv, v.ByteData.Length);
-                        }
-                    }
-                }
-            }
-            return _codeBuffer.Make();
-        }
-
-        internal Pointer Make(out int codeSize) => _codeBuffer.Make(out codeSize);
-
-        internal void Emit(InstructionId instructionId, params Operand[] ops) => _codeBuffer.Emit(instructionId, _instructionOptions, ops);
-
-        internal void Emit(InstructionId instructionId, InstructionOptions options, Operand o0 = null, Operand o1 = null, Operand o2 = null, Operand o3 = null)
-        {
-            _instructionOptions = options;
-            Emit(instructionId, o0, o1, o2, o3);
         }
     }
 }

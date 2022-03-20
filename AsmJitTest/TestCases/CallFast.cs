@@ -1,7 +1,7 @@
 using System;
-using AsmJit.Common;
-using AsmJit.Common.Operands;
+using AsmJit.Common.Enums;
 using AsmJit.CompilerContext;
+using AsmJit.CompilerContext.CodeTree;
 
 namespace AsmJitTest.TestCases
 {
@@ -12,7 +12,7 @@ namespace AsmJitTest.TestCases
             var var = c.SetArgument(c.Int32("var"));
             var fn = c.IntPtr("fn");
 
-            var fp = Memory.Fn(new Func<int, int>(CalledFunction)/*, CallingConvention.HostDefaultFast*/);
+            var fp = FnPointer.Fn(new Func<int, int>(CalledFunction)/*, CallingConvention.HostDefaultFast*/);
             c.Emit(InstructionId.Mov, fn, fp);
 
             var call = c.Call(fn, fp);

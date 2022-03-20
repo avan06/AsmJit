@@ -1,8 +1,8 @@
 using System;
 using System.Runtime.InteropServices;
-using AsmJit.Common;
-using AsmJit.Common.Operands;
+using AsmJit.Common.Enums;
 using AsmJit.CompilerContext;
+using AsmJit.CompilerContext.CodeTree;
 
 namespace AsmJitTest.TestCases
 {
@@ -18,7 +18,7 @@ namespace AsmJitTest.TestCases
             var h = LoadLibrary(IntPtr.Size > 4 ? "SampleDLL64.dll" : "SampleDLL.dll");
             var fnPtr = GetProcAddress(h, "addNumbers");
 
-            var fp = Memory.Fn<Func<int, int, int>>(fnPtr);
+            var fp = FnPointer.Fn<Func<int, int, int>>(fnPtr);
             var fn = c.IntPtr("fn");
             c.Emit(InstructionId.Mov, fn, fp);
             var call = c.Call(fn, fp);
