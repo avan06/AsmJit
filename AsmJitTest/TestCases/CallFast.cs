@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.CompilerContext;
 using AsmJit.CompilerContext.CodeTree;
 
@@ -13,7 +13,7 @@ namespace AsmJitTest.TestCases
             var fn = c.IntPtr("fn");
 
             var fp = FnPointer.Fn(new Func<int, int>(CalledFunction)/*, CallingConvention.HostDefaultFast*/);
-            c.Emit(InstructionId.Mov, fn, fp);
+            c.Emit(Inst.Mov, fn, fp);
 
             var call = c.Call(fn, fp);
             call.SetArgument(var);

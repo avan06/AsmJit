@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 
@@ -35,27 +35,27 @@ namespace AsmJitTest.TestCases
             var l2 = c.Label();
 
             // Fill stack by sequence [0, 1, 2, 3 ... 255].
-            c.Emit(InstructionId.Xor, i, i);
+            c.Emit(Inst.Xor, i, i);
 
             c.Bind(l1);
             c.Emit(
-                InstructionId.Mov, stack.Clone().SetIndex(i), i.As8(),
-                InstructionId.Inc, i,
-                InstructionId.Cmp, i, (Immediate)255,
-                InstructionId.Jle, l1);
+                Inst.Mov, stack.Clone().SetIndex(i), i.As8(),
+                Inst.Inc, i,
+                Inst.Cmp, i, (Immediate)255,
+                Inst.Jle, l1);
 
             // Sum sequence in stack.
             c.Emit(
-                InstructionId.Xor, i, i,
-                InstructionId.Xor, a, a);
+                Inst.Xor, i, i,
+                Inst.Xor, a, a);
 
             c.Bind(l2);
             c.Emit(
-                InstructionId.Movzx, b, stack.Clone().SetIndex(i),
-                InstructionId.Add, a, b,
-                InstructionId.Inc, i,
-                InstructionId.Cmp, i, (Immediate)255,
-                InstructionId.Jle, l2);
+                Inst.Movzx, b, stack.Clone().SetIndex(i),
+                Inst.Add, a, b,
+                Inst.Inc, i,
+                Inst.Cmp, i, (Immediate)255,
+                Inst.Jle, l2);
 
             c.Ret(a);
         }

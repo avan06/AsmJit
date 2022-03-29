@@ -408,5 +408,17 @@ namespace AsmJit.Common.Operands
             }
             return this;
         }
+
+        public bool IsInt8() => Int64.IsInt8();
+
+        public bool IsUInt8() => Int64.IsInt8();
+
+        public bool IsInt16() => Int64.IsInt16();
+
+        public bool IsUInt16() => Int64.IsUInt16();
+
+        public bool IsInt32() => Int64.IsInt32();
+
+        public bool IsUInt32() => Int64.IsUInt32();
     }
 }

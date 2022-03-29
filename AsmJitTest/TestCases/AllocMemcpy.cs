@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.Common.Extensions;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
@@ -44,20 +44,20 @@ namespace AsmJitTest.TestCases
             c.Allocate(cnt); // in physical registers only.
 
             c.Emit(
-                InstructionId.Test, cnt, cnt, // Exit if length is zero.
-                InstructionId.Jz, exit);
+                Inst.Test, cnt, cnt, // Exit if length is zero.
+                Inst.Jz, exit);
 
             c.Bind(loop); // Bind the loop label here.
 
             var tmp = c.Int32("tmp"); // Copy a single dword (4 bytes).
-            c.Emit(InstructionId.Mov, tmp, Memory.DWord(src),
-                InstructionId.Mov, Memory.DWord(dst), tmp,
+            c.Emit(Inst.Mov, tmp, Memory.DWord(src),
+                Inst.Mov, Memory.DWord(dst), tmp,
 
-                InstructionId.Add, src, (Immediate)4, // Increment dst/src pointers.
-                InstructionId.Add, dst, (Immediate)4,
+                Inst.Add, src, (Immediate)4, // Increment dst/src pointers.
+                Inst.Add, dst, (Immediate)4,
 
-                InstructionId.Dec, cnt, // Loop until cnt isn't zero.
-                InstructionId.Jnz, loop);
+                Inst.Dec, cnt, // Loop until cnt isn't zero.
+                Inst.Jnz, loop);
 
             c.Bind(exit); // Bind the exit label here.
         }

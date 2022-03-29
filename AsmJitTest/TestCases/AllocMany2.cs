@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.Common.Extensions;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
@@ -22,26 +22,26 @@ namespace AsmJitTest.TestCases
 
             for (i = 0; i < var.Length; i++)
             {
-                c.Emit(InstructionId.Xor, var[i], var[i]);
+                c.Emit(Inst.Xor, var[i], var[i]);
             }
 
             var v0 = c.Int32("v0");
             var l = c.Label();
 
-            c.Emit(InstructionId.Mov, v0, (Immediate)32);
+            c.Emit(Inst.Mov, v0, (Immediate)32);
             c.Bind(l);
 
             for (i = 0; i < var.Length; i++)
             {
-                c.Emit(InstructionId.Add, var[i], (Immediate)i);
+                c.Emit(Inst.Add, var[i], (Immediate)i);
             }
 
-            c.Emit(InstructionId.Dec, v0);
-            c.Emit(InstructionId.Jnz, l);
+            c.Emit(Inst.Dec, v0);
+            c.Emit(Inst.Jnz, l);
 
             for (i = 0; i < var.Length; i++)
             {
-                c.Emit(InstructionId.Mov, Memory.DWord(a, i * 4), var[i]);
+                c.Emit(Inst.Mov, Memory.DWord(a, i * 4), var[i]);
             }
         }
 

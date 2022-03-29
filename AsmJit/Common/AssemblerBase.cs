@@ -83,9 +83,9 @@ namespace AsmJit.Common
 
         internal Pointer Make(out int codeSize) => _codeBuffer.Make(out codeSize);
 
-        internal void Emit(InstructionId instructionId, params Operand[] ops) => _codeBuffer.Emit(instructionId, _instructionOptions, ops);
+        internal void Emit(InstInfo instructionId, params Operand[] ops) => _codeBuffer.Emit(instructionId, _instructionOptions, ops);
 
-        internal void Emit(InstructionId instructionId, InstructionOptions options, Operand o0 = null, Operand o1 = null, Operand o2 = null, Operand o3 = null)
+        internal void Emit(InstInfo instructionId, InstructionOptions options, Operand o0 = null, Operand o1 = null, Operand o2 = null, Operand o3 = null)
         {
             _instructionOptions = options;
             Emit(instructionId, o0, o1, o2, o3);

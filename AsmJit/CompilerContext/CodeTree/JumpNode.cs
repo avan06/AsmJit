@@ -1,3 +1,4 @@
+using AsmJit.Common;
 using AsmJit.Common.Enums;
 using AsmJit.Common.Operands;
 
@@ -9,6 +10,6 @@ namespace AsmJit.CompilerContext.CodeTree
 
         public JumpNode NextJump;
 
-        public JumpNode(InstructionId instructionId, InstructionOptions instructionOptions, Operand[] operands) : base(instructionId, instructionOptions, operands) { }
+        public JumpNode(InstInfo instructionId, InstructionOptions instructionOptions, Operand[] operands) : base(instructionId, instructionOptions, operands) { }
     }
 }

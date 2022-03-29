@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using AsmJit.Common;
 using AsmJit.Common.Enums;
-using AsmJit.Common.Extensions;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext.CodeTree;
 
@@ -59,7 +58,7 @@ namespace AsmJit.CompilerContext
         public CallNode Call(FnPointer fn)
         {
             var target = IntPtr("fn");
-            Compiler.Emit(InstructionId.Mov, target, fn);
+            Compiler.Emit(Inst.Mov, target, fn);
             return Compiler.CreateCall(target, fn.FunctionDeclaration);
         }
 
@@ -124,12 +123,12 @@ namespace AsmJit.CompilerContext
             }
         }
 
-        public void Emit(InstructionId instructionId, params dynamic[] insts)
+        public void Emit(InstInfo instructionId, params dynamic[] insts)
         {
             List<Operand> ops = new List<Operand>();
             for (int i = 0; i < insts.Length; i++)
             {
-                if (insts[i].GetType() == typeof(InstructionId))
+                if (insts[i].GetType() == typeof(InstInfo))
                 {
                     Compiler.Emit(instructionId, ops.ToArray());
                     instructionId = insts[i];
@@ -141,9 +140,9 @@ namespace AsmJit.CompilerContext
             Compiler.Emit(instructionId, ops.ToArray());
         }
 
-        public void Int3() => Compiler.Emit(InstructionId.Int, (Immediate)3);
+        public void Int3() => Compiler.Emit(Inst.Int, (Immediate)3);
 
-        public void Jmp(Pointer dst) => Compiler.Emit(InstructionId.Jmp, new Immediate((long)dst));//Jmp(new Immediate((long)dst));
+        public void Jmp(Pointer dst) => Compiler.Emit(Inst.Jmp, new Immediate((long)dst));
 
         public void Ret(Operand o0 = null, Operand o1 = null) => Compiler.CreateReturn(o0, o1);
     }

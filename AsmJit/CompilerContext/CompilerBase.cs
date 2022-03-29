@@ -177,7 +177,7 @@ namespace AsmJit.CompilerContext
             return node;
         }
 
-        private void CreateInstructionNode(InstructionId instructionId, Operand[] operands)
+        private void CreateInstructionNode(InstInfo instructionId, Operand[] operands)
         {
             var options = _assemblerBase.GetInstructionOptionsAndReset();
             if (instructionId.IsJump())
@@ -190,12 +190,12 @@ namespace AsmJit.CompilerContext
                     if (operands[0].IsLabel()) target = labelNodes[operands[0].Id];
                     else options |= InstructionOptions.Unfollow;
                 }
-                flags |= instructionId == InstructionId.Jmp ? CodeNodeFlags.Jmp | CodeNodeFlags.Taken : CodeNodeFlags.Jcc;
+                flags |= instructionId == Inst.Jmp ? CodeNodeFlags.Jmp | CodeNodeFlags.Taken : CodeNodeFlags.Jcc;
 
                 if (target != null) next = target.From;
 
                 // The 'jmp' is always taken, conditional jump can contain hint, we detect it.
-                if (instructionId == InstructionId.Jmp) flags |= CodeNodeFlags.Taken;
+                if (instructionId == Inst.Jmp) flags |= CodeNodeFlags.Taken;
                 else if (options.IsSet(InstructionOptions.Taken)) flags |= CodeNodeFlags.Taken;
 
                 var node = new JumpNode(instructionId, options, operands);
@@ -253,9 +253,9 @@ namespace AsmJit.CompilerContext
             return (TV)var;
         }
 
-        internal void Emit(InstructionId instructionId) => CreateInstructionNode(instructionId, new Operand[0]);
+        internal void Emit(InstInfo instructionId) => CreateInstructionNode(instructionId, new Operand[0]);
 
-        internal void Emit(InstructionId instructionId, params Operand[] ops) => CreateInstructionNode(instructionId, ops);
+        internal void Emit(InstInfo instructionId, params Operand[] ops) => CreateInstructionNode(instructionId, ops);
 
         public void Dispose()
         {

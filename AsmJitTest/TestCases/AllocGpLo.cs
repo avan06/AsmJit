@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 
@@ -25,24 +25,24 @@ namespace AsmJitTest.TestCases
             // Init pseudo-regs with values from our array.
             for (i = 0; i < Cnt; i++)
             {
-                c.Emit(InstructionId.Mov, rVar[i], Memory.DWord(rPtr, i * 4));
+                c.Emit(Inst.Mov, rVar[i], Memory.DWord(rPtr, i * 4));
             }
 
             for (i = 2; i < Cnt; i++)
             {
                 // Add and truncate to 8 bit; no purpose, just mess with jit.
                 c.Emit(
-                    InstructionId.Add, rVar[i], rVar[i - 1],
-                    InstructionId.Movzx, rVar[i], rVar[i].As8(),
-                    InstructionId.Movzx, rVar[i - 2], rVar[i - 1].As8(),
-                    InstructionId.Movzx, rVar[i - 1], rVar[i - 2].As8());
+                    Inst.Add, rVar[i], rVar[i - 1],
+                    Inst.Movzx, rVar[i], rVar[i].As8(),
+                    Inst.Movzx, rVar[i - 2], rVar[i - 1].As8(),
+                    Inst.Movzx, rVar[i - 1], rVar[i - 2].As8());
             }
 
             // Sum up all computed values.
-            c.Emit(InstructionId.Mov, rSum, (Immediate)0);
+            c.Emit(Inst.Mov, rSum, (Immediate)0);
             for (i = 0; i < Cnt; i++)
             {
-                c.Emit(InstructionId.Add, rSum, rVar[i]);
+                c.Emit(Inst.Add, rSum, rVar[i]);
             }
 
             // Return the sum.

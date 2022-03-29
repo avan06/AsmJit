@@ -266,6 +266,10 @@ namespace AsmJit.Common.Operands
 
         public bool HasGdpBase => (Flags & Constants.X86.MemGpdMask) != 0;
 
+        internal bool IsBaseIndexType() => MemoryType <= MemoryType.StackIndex;
+
+        internal bool HasBaseOrIndex() => Base != RegisterIndex.Invalid || Index != RegisterIndex.Invalid;
+
         /// <summary>
         /// Creates `[base.reg + offset]` memory operand.
         /// </summary>

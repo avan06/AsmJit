@@ -2,7 +2,6 @@
 using System.Runtime.InteropServices;
 using System.Security;
 using AsmJit.Common;
-using AsmJit.Common.Enums;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 using AsmJitTest.TestCases;
@@ -19,14 +18,14 @@ namespace AsmJitTest
 
             var dst = c.IntPtr("dst");
             var src = c.IntPtr("src");
-
             var idx = c.IntPtr("idx");
+
             var j = c.IntPtr("j");
             var t = c.IntPtr("t");
 
             var cZero = c.Xmm("cZero");
-            var cMul255A = c.Xmm("cMul255A");
-            var cMul255M = c.Xmm("cMul255M");
+            var c0080Mul255A = c.Xmm("cMul255A");
+            var c0101Mul255M = c.Xmm("cMul255M");
 
             var x0 = c.Xmm("x0");
             var x1 = c.Xmm("x1");
@@ -50,119 +49,119 @@ namespace AsmJitTest
 
             // How many pixels have to be processed to make the loop aligned.
             c.Emit(
-                InstructionId.Lea, t, Memory.Ptr(data),
-                InstructionId.Xor, j, j,
-                InstructionId.Xorps, cZero, cZero,
+                Inst.Lea, t, Memory.Ptr(data),
+                Inst.Xor, j, j,
+                Inst.Xorps, cZero, cZero,
 
-                InstructionId.Sub, j, dst,
-                InstructionId.Movaps, cMul255A, Memory.Ptr(t, 0),
+                Inst.Sub, j, dst,
+                Inst.Movaps, c0080Mul255A, Memory.Ptr(t, 0),
 
-                InstructionId.And, j, (Immediate)15,
-                InstructionId.Movaps, cMul255M, Memory.Ptr(t, 16),
+                Inst.And, j, (Immediate)15,
+                Inst.Movaps, c0101Mul255M, Memory.Ptr(t, 16),
 
-                InstructionId.Shr, j, (Immediate)2,
-                InstructionId.Jz, smallEnd,
+                Inst.Shr, j, (Immediate)2,
+                Inst.Jz, smallEnd,
 
                 // j = min(i, j).
-                InstructionId.Cmp, j, idx,
-                InstructionId.Cmovg, j, idx,
+                Inst.Cmp, j, idx,
+                Inst.Cmovg, j, idx,
 
                 // i -= j.
-                InstructionId.Sub, idx, j);
+                Inst.Sub, idx, j);
 
             // Small loop.
             c.Bind(smallLoop);
 
             c.Emit(
-                InstructionId.Pcmpeqb, a0, a0,
-                InstructionId.Movd, y0, Memory.Ptr(src),
+                Inst.Pcmpeqb, a0, a0,
+                Inst.Movd, y0, Memory.Ptr(src),
 
-                InstructionId.Pxor, a0, y0,
-                InstructionId.Movd, x0, Memory.Ptr(dst),
+                Inst.Pxor, a0, y0,
+                Inst.Movd, x0, Memory.Ptr(dst),
 
-                InstructionId.Psrlw, a0, (Immediate)8,
-                InstructionId.Punpcklbw, x0, cZero,
+                Inst.Psrlw, a0, (Immediate)8,
+                Inst.Punpcklbw, x0, cZero,
 
-                InstructionId.Pshuflw, a0, a0, (Immediate)Utils.Shuffle(1, 1, 1, 1),
-                InstructionId.Punpcklbw, y0, cZero,
+                Inst.Pshuflw, a0, a0, (Immediate)Utils.Shuffle(1, 1, 1, 1),
+                Inst.Punpcklbw, y0, cZero,
 
-                InstructionId.Pmullw, x0, a0,
-                InstructionId.Paddsw, x0, cMul255A,
-                InstructionId.Pmulhuw, x0, cMul255M,
+                Inst.Pmullw, x0, a0,
+                Inst.Paddsw, x0, c0080Mul255A,
+                Inst.Pmulhuw, x0, c0101Mul255M,
 
-                InstructionId.Paddw, x0, y0,
-                InstructionId.Packuswb, x0, x0,
+                Inst.Paddw, x0, y0,
+                Inst.Packuswb, x0, x0,
 
-                InstructionId.Movd, Memory.Ptr(dst), x0,
+                Inst.Movd, Memory.Ptr(dst), x0,
 
-                InstructionId.Add, dst, (Immediate)4,
-                InstructionId.Add, src, (Immediate)4,
+                Inst.Add, dst, (Immediate)4,
+                Inst.Add, src, (Immediate)4,
 
-                InstructionId.Dec, j,
-                InstructionId.Jnz, smallLoop);
+                Inst.Dec, j,
+                Inst.Jnz, smallLoop);
 
             // Second section, prepare for an aligned loop.
             c.Bind(smallEnd);
             c.Emit(
-                InstructionId.Test, idx, idx,
-                InstructionId.Mov, j, idx,
-                InstructionId.Jz, c.Exit,
+                Inst.Test, idx, idx,
+                Inst.Mov, j, idx,
+                Inst.Jz, c.Exit,
 
-                InstructionId.And, j, (Immediate)3,
-                InstructionId.Shr, idx, (Immediate)2,
-                InstructionId.Jz, largeEnd);
+                Inst.And, j, (Immediate)3,
+                Inst.Shr, idx, (Immediate)2,
+                Inst.Jz, largeEnd);
 
             // Aligned loop.
             c.Bind(largeLoop);
             c.Emit(
-                InstructionId.Movups, y0, Memory.Ptr(src),
-                InstructionId.Pcmpeqb, a0, a0,
-                InstructionId.Movaps, x0, Memory.Ptr(dst),
+                Inst.Movups, y0, Memory.Ptr(src),
+                Inst.Pcmpeqb, a0, a0,
+                Inst.Movaps, x0, Memory.Ptr(dst),
 
-                InstructionId.Xorps, a0, y0,
-                InstructionId.Movaps, x1, x0,
+                Inst.Xorps, a0, y0,
+                Inst.Movaps, x1, x0,
 
-                InstructionId.Psrlw, a0, (Immediate)8,
-                InstructionId.Punpcklbw, x0, cZero,
+                Inst.Psrlw, a0, (Immediate)8,
+                Inst.Punpcklbw, x0, cZero,
 
-                InstructionId.Movaps, a1, a0,
-                InstructionId.Punpcklwd, a0, a0,
+                Inst.Movaps, a1, a0,
+                Inst.Punpcklwd, a0, a0,
 
-                InstructionId.Punpckhbw, x1, cZero,
-                InstructionId.Punpckhwd, a1, a1,
+                Inst.Punpckhbw, x1, cZero,
+                Inst.Punpckhwd, a1, a1,
 
-                InstructionId.Pshufd, a0, a0, (Immediate)Utils.Shuffle(3, 3, 1, 1),
-                InstructionId.Pshufd, a1, a1, (Immediate)Utils.Shuffle(3, 3, 1, 1),
+                Inst.Pshufd, a0, a0, (Immediate)Utils.Shuffle(3, 3, 1, 1),
+                Inst.Pshufd, a1, a1, (Immediate)Utils.Shuffle(3, 3, 1, 1),
 
-                InstructionId.Pmullw, x0, a0,
-                InstructionId.Pmullw, x1, a1,
+                Inst.Pmullw, x0, a0,
+                Inst.Pmullw, x1, a1,
 
-                InstructionId.Paddsw, x0, cMul255A,
-                InstructionId.Paddsw, x1, cMul255A,
+                Inst.Paddsw, x0, c0080Mul255A,
+                Inst.Paddsw, x1, c0080Mul255A,
 
-                InstructionId.Pmulhuw, x0, cMul255M,
-                InstructionId.Pmulhuw, x1, cMul255M,
+                Inst.Pmulhuw, x0, c0101Mul255M,
+                Inst.Pmulhuw, x1, c0101Mul255M,
 
-                InstructionId.Add, src, (Immediate)16,
-                InstructionId.Packuswb, x0, x1,
+                Inst.Add, src, (Immediate)16,
+                Inst.Packuswb, x0, x1,
 
-                InstructionId.Paddw, x0, y0,
-                InstructionId.Movaps, Memory.Ptr(dst), x0,
+                Inst.Paddw, x0, y0,
+                Inst.Movaps, Memory.Ptr(dst), x0,
 
-                InstructionId.Add, dst, (Immediate)16,
+                Inst.Add, dst, (Immediate)16,
 
-                InstructionId.Dec, idx,
-                InstructionId.Jnz, largeLoop);
+                Inst.Dec, idx,
+                Inst.Jnz, largeLoop);
 
             c.Bind(largeEnd);
             c.Emit(
-                InstructionId.Test, j, j,
-                InstructionId.Jnz, smallLoop);
+                Inst.Test, j, j,
+                Inst.Jnz, smallLoop);
 
             // Data
             c.Data(data, 16,
                 Data.Of(0x0080008000800080, 0x0080008000800080),
-                Data.Of(0x0101010101010101, 0x0080008000800080));
+                Data.Of(0x0101010101010101, 0x0101010101010101));
 
             return c.Compile();
         }
@@ -208,10 +207,10 @@ namespace AsmJitTest
             t1.Start();
             for (int i = 0; i < 1000000; i++)
             {
-                var e = new uint[cnt];
+                var expBuffer = new uint[cnt];
                 for (var z = 0; z < cnt; z++)
                 {
-                    e[z] = BlendSrcOver(dst[z], src[z]);
+                    expBuffer[z] = BlendSrcOver(dst[z], src[z]);
                 }	
             }
             t1.Stop();
@@ -230,7 +229,7 @@ namespace AsmJitTest
             var tt2 = t2.Milliseconds;
             #endregion
 
-            Console.WriteLine("BlendSrcOver Test, ");
+            Console.WriteLine("AllocBlendSrcOver Test, ");
             Console.WriteLine(string.Format("NET ver elapsed: {0} Milliseconds", tt1));
             Console.WriteLine(string.Format("Asm ver elapsed: {0} Milliseconds", tt2));
             Console.ReadKey();

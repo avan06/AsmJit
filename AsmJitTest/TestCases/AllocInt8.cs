@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.CompilerContext;
 
 namespace AsmJitTest.TestCases
@@ -11,7 +11,7 @@ namespace AsmJitTest.TestCases
             var x = c.SetArgument(c.Int8("x"));
             var y = c.Int8("y");
 
-            c.Emit(InstructionId.Movsx, y, x);
+            c.Emit(Inst.Movsx, y, x);
 
             c.Ret(y);
         }

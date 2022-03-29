@@ -1,6 +1,6 @@
 using System;
 using System.Globalization;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 
@@ -22,15 +22,15 @@ namespace AsmJitTest.TestCases
                 c.SetArgument(xv[i]);
             }
             c.SetArgument(p);
-
             c.Emit(
-                InstructionId.Addsd, xv[0], xv[1],
-                InstructionId.Addsd, xv[0], xv[2],
-                InstructionId.Addsd, xv[0], xv[3],
-                InstructionId.Addsd, xv[0], xv[4],
-                InstructionId.Addsd, xv[0], xv[5],
-                InstructionId.Addsd, xv[0], xv[6],
-                InstructionId.Movsd, Memory.Ptr(p), xv[0]);
+                Inst.Addsd, xv[0], xv[1],
+                Inst.Addsd, xv[0], xv[2],
+                Inst.Addsd, xv[0], xv[3],
+                Inst.Addsd, xv[0], xv[4],
+                Inst.Addsd, xv[0], xv[5],
+                Inst.Addsd, xv[0], xv[6],
+                Inst.Movsd, Memory.Ptr(p), xv[0]
+                );
         }
 
         protected override void Execute(Action<double, double, double, double, double, double, double, IntPtr> fn, out string result, out string expected)

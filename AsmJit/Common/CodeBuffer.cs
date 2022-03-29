@@ -16,26 +16,26 @@ namespace AsmJit.Common
 
         private class EmitContextData
         {
-            public long OpCode;
-            public long ImmediateValue;
-            public int ImmediateLength;
-            public int Base;
-            public int Index;
-            public LabelData Label;
-            public int DisplacementOffset;
-            public int DisplacementSize;
-            public int RelocationId;
-            public int ModRmRegister;
-            public Memory ModRmMemory;
-            public long Operand;
-            public InstructionOptions InstructionOptions;
-            public Operand Operand0 { get; private set; }
-            public Operand Operand1 { get; private set; }
-            public Operand Operand2 { get; private set; }
-            public Operand Operand3 { get; private set; }
-            public long SecondaryOpCode { get; private set; }
+            internal long OpCode;
+            internal long ImmediateValue;
+            internal int ImmediateLength;
+            internal int Base;
+            internal int Index;
+            internal LabelData Label;
+            internal int DisplacementOffset;
+            internal int DisplacementSize;
+            internal int RelocationId;
+            internal int ModRmRegister;
+            internal Memory ModRmMemory;
+            internal long Operand;
+            internal InstructionOptions InstructionOptions;
+            internal Operand Operand0 { get; private set; }
+            internal Operand Operand1 { get; private set; }
+            internal Operand Operand2 { get; private set; }
+            internal Operand Operand3 { get; private set; }
+            internal long SecondaryOpCode { get; private set; }
 
-            public void Init(long primaryOpCode, long secondaryOpCode, InstructionOptions instructionOptions, Operand op0, Operand op1, Operand op2, Operand op3)
+            internal void Init(long primaryOpCode, long secondaryOpCode, InstructionOptions instructionOptions, Operand op0, Operand op1, Operand op2, Operand op3)
             {
                 Operand0 = op0;
                 Operand1 = op1;
@@ -69,23 +69,23 @@ namespace AsmJit.Common
 
         private sealed class RelocationData
         {
-            public Pointer Data { get; set; }
-            public Pointer From { get; set; }
-            public int Size { get; set; }
-            public RelocationMode Mode { get; set; }
+            internal Pointer Data;
+            internal Pointer From;
+            internal int Size;
+            internal RelocationMode Mode;
         }
 
         private class OpCodeMm
         {
-            public OpCodeMm(int length = 0, params byte[] data)
+            internal readonly int Length;
+            internal readonly byte[] Data;
+
+            internal OpCodeMm(int length = 0, params byte[] data)
             {
                 if (data == null || data.Length == 0) data = new byte[] { 0x00, 0x00, 0 };
                 Length = length;
                 Data = data;
             }
-
-            public int Length { get; private set; }
-            public byte[] Data { get; private set; }
         }
 
         private static OpCodeMm[] _opCodeMm =
@@ -462,7 +462,7 @@ namespace AsmJit.Common
             _cursor = newBuffer + offset;
         }
 
-        internal void Emit(InstructionId code, InstructionOptions options, params Operand[] ops)
+        internal void Emit(InstInfo code, InstructionOptions options, params Operand[] ops)
         {
             Operand op0 = ops == null || ops.Length < 1 || ops[0] == null ? Operand.Invalid : ops[0];
             Operand op1 = ops == null || ops.Length < 2 || ops[1] == null ? Operand.Invalid : ops[1];
@@ -473,8 +473,8 @@ namespace AsmJit.Common
 
             if (RemainingSpace < 16) Grow(16);
 
-            long primaryOpCode = code.GetPrimaryOpCode();
-            var extendedInfo = code.GetExtendedInfo();
+            long primaryOpCode = code.PrimaryOpCode;
+            var extendedInfo = code.ExtendedInfo;
 
             if (Constants.X64)
             {
@@ -1651,7 +1651,7 @@ namespace AsmJit.Common
                             AddRexWBySize(op0.Size);
 
                             // Special opcode for 'xchg ?ax, reg'.
-                            if (code == InstructionId.Xchg && op0.Size > 1 && (_eh.Operand == 0 || _eh.ModRmRegister == 0))
+                            if (code == Inst.Xchg && op0.Size > 1 && (_eh.Operand == 0 || _eh.ModRmRegister == 0))
                             {
                                 _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
                                 _eh.OpCode |= 0x90;
@@ -1773,21 +1773,21 @@ namespace AsmJit.Common
 
                         if (OperandsAre(OperandType.Register))
                         {
-                            if (code == InstructionId.Fld)
+                            if (code == Inst.Fld)
                             {
                                 _eh.OpCode = 0xD9C0 + (uint)OpReg(op0);
                                 EmitFpuOp();
                                 break;
                             }
 
-                            if (code == InstructionId.Fst)
+                            if (code == Inst.Fst)
                             {
                                 _eh.OpCode = 0xDDD0 + (uint)OpReg(op0);
                                 EmitFpuOp();
                                 break;
                             }
 
-                            if (code == InstructionId.Fstp)
+                            if (code == Inst.Fstp)
                             {
                                 _eh.OpCode = 0xDDD8 + (uint)OpReg(op0);
                                 EmitFpuOp();

@@ -1,6 +1,6 @@
 using System;
 using System.Globalization;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 using AsmJit.CompilerContext.CodeTree;
@@ -20,8 +20,8 @@ namespace AsmJitTest.TestCases
             var fp = FnPointer.Fn(new Func<double, double>(CalledFunction));
 
             c.Emit(
-                InstructionId.Movsd, arg, Memory.Ptr(p),
-                InstructionId.Mov, fn, fp);
+                Inst.Movsd, arg, Memory.Ptr(p),
+                Inst.Mov, fn, fp);
 
             var call = c.Call(fn, fp);
             call.SetArgument(arg);

@@ -4,14 +4,14 @@ namespace AsmJit.Common
 {
     public class CodeContextBase
     {
-        public InstructionId[] _condToCmovcc = { InstructionId.Cmovo, InstructionId.Cmovno, InstructionId.Cmovb, InstructionId.Cmovae, InstructionId.Cmove, InstructionId.Cmovne, InstructionId.Cmovbe, InstructionId.Cmova, InstructionId.Cmovs, InstructionId.Cmovns, InstructionId.Cmovpe, InstructionId.Cmovpo, InstructionId.Cmovl, InstructionId.Cmovge, InstructionId.Cmovle, InstructionId.Cmovg, InstructionId.None, InstructionId.None, InstructionId.None, InstructionId.None };
-        public InstructionId[] _condToJcc = { InstructionId.Jo, InstructionId.Jno, InstructionId.Jb, InstructionId.Jae, InstructionId.Je, InstructionId.Jne, InstructionId.Jbe, InstructionId.Ja, InstructionId.Js, InstructionId.Jns, InstructionId.Jpe, InstructionId.Jpo, InstructionId.Jl, InstructionId.Jge, InstructionId.Jle, InstructionId.Jg, InstructionId.None, InstructionId.None, InstructionId.None, InstructionId.None };
-        public InstructionId[] _condToSetcc = { InstructionId.Seto, InstructionId.Setno, InstructionId.Setb, InstructionId.Setae, InstructionId.Sete, InstructionId.Setne, InstructionId.Setbe, InstructionId.Seta, InstructionId.Sets, InstructionId.Setns, InstructionId.Setpe, InstructionId.Setpo, InstructionId.Setl, InstructionId.Setge, InstructionId.Setle, InstructionId.Setg, InstructionId.None, InstructionId.None, InstructionId.None, InstructionId.None };
+        public InstInfo[] _condToCmovcc = { Inst.Cmovo, Inst.Cmovno, Inst.Cmovb, Inst.Cmovae, Inst.Cmove, Inst.Cmovne, Inst.Cmovbe, Inst.Cmova, Inst.Cmovs, Inst.Cmovns, Inst.Cmovpe, Inst.Cmovpo, Inst.Cmovl, Inst.Cmovge, Inst.Cmovle, Inst.Cmovg, Inst.None, Inst.None, Inst.None, Inst.None };
+        public InstInfo[] _condToJcc = { Inst.Jo, Inst.Jno, Inst.Jb, Inst.Jae, Inst.Je, Inst.Jne, Inst.Jbe, Inst.Ja, Inst.Js, Inst.Jns, Inst.Jpe, Inst.Jpo, Inst.Jl, Inst.Jge, Inst.Jle, Inst.Jg, Inst.None, Inst.None, Inst.None, Inst.None };
+        public InstInfo[] _condToSetcc = { Inst.Seto, Inst.Setno, Inst.Setb, Inst.Setae, Inst.Sete, Inst.Setne, Inst.Setbe, Inst.Seta, Inst.Sets, Inst.Setns, Inst.Setpe, Inst.Setpo, Inst.Setl, Inst.Setge, Inst.Setle, Inst.Setg, Inst.None, Inst.None, Inst.None, Inst.None };
 
-        public InstructionId CondToCmovcc(Condition cond) => _condToCmovcc[(int)cond];
+        public InstInfo CondToCmovcc(Condition cond) => _condToCmovcc[(int)cond];
 
-        public InstructionId CondToJcc(Condition cond) => _condToJcc[(int)cond];
+        public InstInfo CondToJcc(Condition cond) => _condToJcc[(int)cond];
 
-        public InstructionId CondToSetcc(Condition cond) => _condToSetcc[(int)cond];
+        public InstInfo CondToSetcc(Condition cond) => _condToSetcc[(int)cond];
     }
 }

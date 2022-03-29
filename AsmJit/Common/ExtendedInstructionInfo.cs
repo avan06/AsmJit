@@ -1,5 +1,6 @@
 using System;
 using AsmJit.Common.Enums;
+using AsmJit.Common.Extensions;
 
 namespace AsmJit.Common
 {
@@ -25,5 +26,23 @@ namespace AsmJit.Common
             WriteSize = writeSize;
             SecondaryOpCode = secop;
         }
+
+        public bool IsFlow() => InstructionFlags.IsSet(Constants.X86.InstFlagFlow);
+
+        public bool IsTest() => InstructionFlags.IsSet(Constants.X86.InstFlagTest);
+
+        public bool IsMove() => InstructionFlags.IsSet(Constants.X86.InstFlagMove);
+
+        public bool IsXchg() => InstructionFlags.IsSet(Constants.X86.InstFlagXchg);
+
+        public bool IsFp() => InstructionFlags.IsSet(Constants.X86.InstFlagFp);
+
+        public bool IsLockable() => InstructionFlags.IsSet(Constants.X86.InstFlagLock);
+
+        public bool IsSpecial() => InstructionFlags.IsSet(Constants.X86.InstFlagSpecial);
+
+        public bool IsSpecialMem() => InstructionFlags.IsSet(Constants.X86.InstFlagSpecialMem);
+
+        public bool IsZeroIfMem() => InstructionFlags.IsSet(Constants.X86.InstFlagZ);
     }
 }

@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 
@@ -19,12 +19,12 @@ namespace AsmJitTest.TestCases
                 var hi = c.Int32("hi");
 
                 c.Emit(
-                    InstructionId.Mov, x, Memory.DWord(src, 0),
-                    InstructionId.Mov, y, Memory.DWord(src, 4),
+                    Inst.Mov, x, Memory.DWord(src, 0),
+                    Inst.Mov, y, Memory.DWord(src, 4),
 
-                    InstructionId.Imul, hi, x, y,
-                    InstructionId.Add, Memory.DWord(dst, 0), hi,
-                    InstructionId.Add, Memory.DWord(dst, 4), x);
+                    Inst.Imul, hi, x, y,
+                    Inst.Add, Memory.DWord(dst, 0), hi,
+                    Inst.Add, Memory.DWord(dst, 4), x);
             }
         }
 

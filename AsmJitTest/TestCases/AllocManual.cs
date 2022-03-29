@@ -1,6 +1,5 @@
 using System;
 using AsmJit.Common;
-using AsmJit.Common.Enums;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 
@@ -31,21 +30,21 @@ namespace AsmJitTest.TestCases
             var v1 = c.Int32("v1");
             var cnt = c.Int32("cnt");
 
-            c.Emit(InstructionId.Xor, v0, v0,
-                InstructionId.Xor, v1, v1);
+            c.Emit(Inst.Xor, v0, v0,
+                Inst.Xor, v1, v1);
             c.Spill(v0);
             c.Spill(v1);
 
             var l = c.Label();
-            c.Emit(InstructionId.Mov, cnt, (Immediate)32);
+            c.Emit(Inst.Mov, cnt, (Immediate)32);
 
             c.Bind(l);
             c.Emit(
-                InstructionId.Inc, v1,
-                InstructionId.Add, v0, v1,
+                Inst.Inc, v1,
+                Inst.Add, v0, v1,
 
-                InstructionId.Dec, cnt,
-                InstructionId.Jnz, l);
+                Inst.Dec, cnt,
+                Inst.Jnz, l);
 
             c.Ret(v0);
         }

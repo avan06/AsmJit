@@ -41,6 +41,22 @@
 
         protected internal int Reserved3 { get; protected set; }
 
+        internal bool IsInvalid() => OperandType == OperandType.Invalid;
+
+        internal bool IsRegister() => OperandType == OperandType.Register;
+
+        internal bool IsVariable() => OperandType == OperandType.Variable;
+
+        internal bool IsMemory() => OperandType == OperandType.Memory;
+
+        internal bool IsVariableOrMemory() => IsVariable() || IsMemory();
+
+        internal bool IsImmedate() => OperandType == OperandType.Immediate;
+
+        internal bool IsLabel() => OperandType == OperandType.Label;
+
+        internal bool IsRegisterType(RegisterType type) => IsRegister() && Reserved1 == (int)type;
+
         internal virtual T As<T>() where T : Operand => this as T;
 
         public override string ToString() => string.Format("[{0}: Id={1}, Size={2}]", OperandType, Id == Constants.InvalidId ? "#" : Id.ToString(), Size);

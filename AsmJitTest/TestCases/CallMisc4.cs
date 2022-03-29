@@ -1,6 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.CompilerContext;
 using AsmJit.CompilerContext.CodeTree;
 
@@ -20,7 +20,7 @@ namespace AsmJitTest.TestCases
 
             var fp = FnPointer.Fn<Func<int, int, int>>(fnPtr);
             var fn = c.IntPtr("fn");
-            c.Emit(InstructionId.Mov, fn, fp);
+            c.Emit(Inst.Mov, fn, fp);
             var call = c.Call(fn, fp);
             call.SetArgument(c.Int32("v0"), c.Int32("v1"));
             var v2 = call.SetReturn(c.Int32("v2"));

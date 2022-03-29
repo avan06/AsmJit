@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 
@@ -21,12 +21,12 @@ namespace AsmJitTest.TestCases
 
             for (i = 0; i < cnt; i++)
             {
-                c.Emit(InstructionId.Add, var[i], (Immediate)(i + 1));
+                c.Emit(Inst.Add, var[i], (Immediate)(i + 1));
             }
 
             for (i = 0; i < cnt; i++)
             {
-                c.Emit(InstructionId.Add, Memory.Byte(var[i]), (Immediate)(i + 1));
+                c.Emit(Inst.Add, Memory.Byte(var[i]), (Immediate)(i + 1));
             }
         }
 

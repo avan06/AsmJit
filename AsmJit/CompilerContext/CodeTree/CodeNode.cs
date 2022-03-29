@@ -1,4 +1,5 @@
-﻿using AsmJit.Common.Variables;
+﻿using AsmJit.Common.Extensions;
+using AsmJit.Common.Variables;
 
 namespace AsmJit.CompilerContext.CodeTree
 {
@@ -27,5 +28,23 @@ namespace AsmJit.CompilerContext.CodeTree
         }
 
         public T As<T>() where T : CodeNode => this as T;
+
+        internal bool IsFetched() => FlowId != 0;
+
+        internal bool IsRemovable() => Flags.IsSet(CodeNodeFlags.Removable);
+
+        internal bool IsInformative() => Flags.IsSet(CodeNodeFlags.Informative);
+
+        internal bool IsTranslated() => Flags.IsSet(CodeNodeFlags.Translated);
+
+        internal bool IsScheduled() => Flags.IsSet(CodeNodeFlags.Scheduled);
+
+        internal bool IsRet() => Flags.IsSet(CodeNodeFlags.Ret);
+
+        internal bool IsJmp() => Flags.IsSet(CodeNodeFlags.Jmp);
+
+        internal bool IsJcc() => Flags.IsSet(CodeNodeFlags.Jcc);
+
+        internal bool IsJmpOrJcc() => IsJmp() || IsJcc();
     }
 }

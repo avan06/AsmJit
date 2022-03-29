@@ -34,7 +34,7 @@ There is no conclusion on which concept is better. Assembler brings full control
 -----
 
 ```csharp
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 // Create Compiler's (high-level) code context defining what kind of function (delegate) we want it to be compiled to.
@@ -59,26 +59,26 @@ c.SetArgument(r0, r1, r2, r3);
 // Load values arguments point to (dereference IntPtr)
 c.Emit(
     // eax = *r0
-    InstructionId.Mov, eax, X64 ? Memory.QWord(r0) : Memory.DWord(r0),
+    Inst.Mov, eax, X64 ? Memory.QWord(r0) : Memory.DWord(r0),
     // ebx = *r1
-    InstructionId.Mov, ebx, X64 ? Memory.QWord(r1) : Memory.DWord(r1),
+    Inst.Mov, ebx, X64 ? Memory.QWord(r1) : Memory.DWord(r1),
     // ecx = *r2
-    InstructionId.Mov, ecx, X64 ? Memory.QWord(r2) : Memory.DWord(r2),
+    Inst.Mov, ecx, X64 ? Memory.QWord(r2) : Memory.DWord(r2),
     // edx = *r3
-    InstructionId.Mov, edx, X64 ? Memory.QWord(r3) : Memory.DWord(r3),
+    Inst.Mov, edx, X64 ? Memory.QWord(r3) : Memory.DWord(r3),
 
     // Now execute Cpuid instruction
-    InstructionId.Cpuid, eax, ebx, ecx, edx,
+    Inst.Cpuid, eax, ebx, ecx, edx,
 
     // Load result back into arguments addresses
     // *r0 = eax
-    InstructionId.Mov, X64 ? Memory.QWord(r0) : Memory.DWord(r0), eax,
+    Inst.Mov, X64 ? Memory.QWord(r0) : Memory.DWord(r0), eax,
     // *r1 = ebx
-    InstructionId.Mov, X64 ? Memory.QWord(r1) : Memory.DWord(r1), ebx,
+    Inst.Mov, X64 ? Memory.QWord(r1) : Memory.DWord(r1), ebx,
     // *r2 = ecx
-    InstructionId.Mov, X64 ? Memory.QWord(r2) : Memory.DWord(r2), ecx,
+    Inst.Mov, X64 ? Memory.QWord(r2) : Memory.DWord(r2), ecx,
     // *r3 = eadx
-    InstructionId.Mov, X64 ? Memory.QWord(r3) : Memory.DWord(r3), edx);
+    Inst.Mov, X64 ? Memory.QWord(r3) : Memory.DWord(r3), edx);
 
 // End return out of here :)
 c.Ret();
@@ -117,7 +117,6 @@ var isSse2Supported = (regs[2] & sse2bit) == sse2bit;
 ```csharp
 using AsmJit.AssemblerContext;
 //using AsmJit.Common;
-//using AsmJit.Common.Enums;
 //using AsmJit.Common.Operands;
 
 // Create Compiler's (low-level) code context defining what kind of assembler we want it to be compiled to.
@@ -125,14 +124,14 @@ var c = Assembler.CreateContext<Func<int, int, int, int, int>>();
 
 //The following Assembler implements the function of add up each parameters.
 //var R = Cpu.Registers;
-//c.Emit(InstructionId.Push, R.Rbx);
-//c.Emit(InstructionId.Mov, R.Eax, R.Ecx);
-//c.Emit(InstructionId.Mov, R.Ebx, R.Edx);
-//c.Emit(InstructionId.Lea, R.Ecx, Memory.DWord(R.Eax, R.Ebx));
-//c.Emit(InstructionId.Lea, R.Edx, Memory.DWord(R.R8D, R.R9D));
-//c.Emit(InstructionId.Lea, R.Ecx, Memory.DWord(R.Ecx, R.Edx));
-//c.Emit(InstructionId.Mov, R.Eax, R.Ecx);
-//c.Emit(InstructionId.Pop, R.Rbx);
+//c.Emit(Inst.Push, R.Rbx);
+//c.Emit(Inst.Mov, R.Eax, R.Ecx);
+//c.Emit(Inst.Mov, R.Ebx, R.Edx);
+//c.Emit(Inst.Lea, R.Ecx, Memory.DWord(R.Eax, R.Ebx));
+//c.Emit(Inst.Lea, R.Edx, Memory.DWord(R.R8D, R.R9D));
+//c.Emit(Inst.Lea, R.Ecx, Memory.DWord(R.Ecx, R.Edx));
+//c.Emit(Inst.Mov, R.Eax, R.Ecx);
+//c.Emit(Inst.Pop, R.Rbx);
 //c.Ret();
 c.Emit(@"
 Push Rbx

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using AsmJit.Common.Enums;
 
 namespace AsmJit.Common
@@ -262,6 +263,13 @@ namespace AsmJit.Common
             {
                 return *((uint*)_ptr + index);
             }
+        }
+
+        internal T ToCallable<T>(Type delegateType)
+        {
+            var fn = Marshal.GetDelegateForFunctionPointer(this, delegateType);
+            var fd = DelegateCreator.CreateCompatibleDelegate<T>(fn, fn.Method);
+            return fd;
         }
 
         public override string ToString()

@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 
@@ -14,8 +14,8 @@ namespace AsmJitTest.TestCases
             var dst0 = c.SetArgument(c.IntPtr("dst0"));
 
             c.Emit(
-                InstructionId.Cmp, src0, src1,
-                InstructionId.Setz, Memory.Byte(dst0));
+                Inst.Cmp, src0, src1,
+                Inst.Setz, Memory.Byte(dst0));
         }
 
         protected override void Execute(Action<int, int, IntPtr> fn, out string result, out string expected)

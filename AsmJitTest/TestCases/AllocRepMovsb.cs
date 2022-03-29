@@ -1,6 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.CompilerContext;
 
 namespace AsmJitTest.TestCases
@@ -13,7 +13,7 @@ namespace AsmJitTest.TestCases
             var src = c.SetArgument(c.IntPtr("src"));
             var cnt = c.SetArgument(c.IntPtr("cnt"));
 
-            c.Emit(InstructionId.RepMovsB, dst, src, cnt);
+            c.Emit(Inst.RepMovsB, dst, src, cnt);
         }
 
         protected override void Execute(Action<IntPtr, IntPtr, int> fn, out string result, out string expected)

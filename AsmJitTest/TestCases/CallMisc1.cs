@@ -1,6 +1,5 @@
 using System;
 using AsmJit.Common;
-using AsmJit.Common.Enums;
 using AsmJit.Common.Operands;
 using CodeContext = AsmJit.CompilerContext.CodeContext;
 
@@ -24,8 +23,8 @@ namespace AsmJitTest.TestCases
             //call.SetArgument(b);
 
             c.Emit(
-                InstructionId.Lea, r, Memory.Ptr(a1, a2),
-                InstructionId.Lea, r, Memory.Ptr(r, a3));
+                Inst.Lea, r, Memory.Ptr(a1, a2),
+                Inst.Lea, r, Memory.Ptr(r, a3));
             c.Ret(r);
         }
 

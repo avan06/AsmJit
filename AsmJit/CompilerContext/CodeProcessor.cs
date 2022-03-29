@@ -1,7 +1,6 @@
 ﻿using System;
 using AsmJit.Common;
 using AsmJit.Common.Enums;
-using AsmJit.Common.Extensions;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext.CodeTree;
 
@@ -52,150 +51,144 @@ namespace AsmJit.CompilerContext
                         {
                             switch (instId)
                             {
-                                case InstructionId.Cpuid:
+                                case var value when value == Inst.Cpuid:
                                     break;
 
-                                case InstructionId.Cbw:
-                                case InstructionId.Cdq:
-                                case InstructionId.Cdqe:
-                                case InstructionId.Cwd:
-                                case InstructionId.Cwde:
-                                case InstructionId.Cqo:
+                                case var value when
+                                value == Inst.Cbw ||
+                                value == Inst.Cdq ||
+                                value == Inst.Cdqe ||
+                                value == Inst.Cwd ||
+                                value == Inst.Cwde ||
+                                value == Inst.Cqo:
                                     break;
 
-                                case InstructionId.Cmpxchg:
+                                case var value when value == Inst.Cmpxchg:
                                     o0 = opList[1];
                                     o1 = opList[2];
                                     break;
 
-                                case InstructionId.Cmpxchg8b:
-                                case InstructionId.Cmpxchg16b:
+                                case var value when value == Inst.Cmpxchg8b || value == Inst.Cmpxchg16b:
                                     o0 = opList[4];
                                     break;
 
-                                case InstructionId.Daa:
-                                case InstructionId.Das:
+                                case var value when value == Inst.Daa || value == Inst.Das:
                                     break;
 
-                                case InstructionId.Imul:
-                                case InstructionId.Mul:
-                                case InstructionId.Idiv:
-                                case InstructionId.Div:
+                                case var value when
+                                value == Inst.Imul ||
+                                value == Inst.Mul ||
+                                value == Inst.Idiv ||
+                                value == Inst.Div:
                                     // Assume "Mul/Div dst_hi (implicit), dst_lo (implicit), src (explicit)".
-                                    if (!(opCount == 3)) { throw new ArgumentException(); }
+                                    if (opCount != 3) throw new ArgumentException();
                                     o0 = opList[2];
                                     break;
 
-                                case InstructionId.MovPtr:
+                                case var value when value == Inst.MovPtr:
                                     break;
 
-                                case InstructionId.Lahf:
-                                case InstructionId.Sahf:
+                                case var value when value == Inst.Lahf || value == Inst.Sahf:
                                     break;
 
-                                case InstructionId.Maskmovq:
-                                case InstructionId.Maskmovdqu:
+                                case var value when value == Inst.Maskmovq || value == Inst.Maskmovdqu:
                                     o0 = opList[1];
                                     o1 = opList[2];
                                     break;
 
-                                case InstructionId.Enter:
+                                case var value when value == Inst.Enter:
                                     o0 = opList[0];
                                     o1 = opList[1];
                                     break;
 
-                                case InstructionId.Leave:
+                                case var value when value == Inst.Leave:
                                     break;
 
-                                case InstructionId.Ret:
-                                    if (opCount > 0)
-                                        o0 = opList[0];
+                                case var value when value == Inst.Ret:
+                                    if (opCount > 0) o0 = opList[0];
                                     break;
 
-                                case InstructionId.Monitor:
-                                case InstructionId.Mwait:
+                                case var value when value == Inst.Monitor || value == Inst.Mwait:
                                     break;
 
-                                case InstructionId.Pop:
+                                case var value when value == Inst.Pop:
                                     o0 = opList[0];
                                     break;
 
-                                case InstructionId.Popa:
-                                case InstructionId.Popf:
+                                case var value when value == Inst.Popa || value == Inst.Popf:
                                     break;
 
-                                case InstructionId.Push:
+                                case var value when value == Inst.Push:
                                     o0 = opList[0];
                                     break;
 
-                                case InstructionId.Pusha:
-                                case InstructionId.Pushf:
+                                case var value when value == Inst.Pusha || value == Inst.Pushf:
                                     break;
 
-                                case InstructionId.Rcl:
-                                case InstructionId.Rcr:
-                                case InstructionId.Rol:
-                                case InstructionId.Ror:
-                                case InstructionId.Sal:
-                                case InstructionId.Sar:
-                                case InstructionId.Shl:
-                                case InstructionId.Shr:
+                                case var value when
+                                value == Inst.Rcl ||
+                                value == Inst.Rcr ||
+                                value == Inst.Rol ||
+                                value == Inst.Ror ||
+                                value == Inst.Sal ||
+                                value == Inst.Sar ||
+                                value == Inst.Shl ||
+                                value == Inst.Shr:
                                     o0 = opList[0];
                                     o1 = Cpu.Registers.Cl;
                                     break;
 
-                                case InstructionId.Shld:
-                                case InstructionId.Shrd:
+                                case var value when value == Inst.Shld || value == Inst.Shrd:
                                     o0 = opList[0];
                                     o1 = opList[1];
                                     o2 = Cpu.Registers.Cl;
                                     break;
 
-                                case InstructionId.Rdtsc:
-                                case InstructionId.Rdtscp:
+                                case var value when value == Inst.Rdtsc || value == Inst.Rdtscp:
                                     break;
 
-                                case InstructionId.RepLodsB:
-                                case InstructionId.RepLodsD:
-                                case InstructionId.RepLodsQ:
-                                case InstructionId.RepLodsW:
-                                case InstructionId.RepMovsB:
-                                case InstructionId.RepMovsD:
-                                case InstructionId.RepMovsQ:
-                                case InstructionId.RepMovsW:
-                                case InstructionId.RepStosB:
-                                case InstructionId.RepStosD:
-                                case InstructionId.RepStosQ:
-                                case InstructionId.RepStosW:
-                                case InstructionId.RepeCmpsB:
-                                case InstructionId.RepeCmpsD:
-                                case InstructionId.RepeCmpsQ:
-                                case InstructionId.RepeCmpsW:
-                                case InstructionId.RepeScasB:
-                                case InstructionId.RepeScasD:
-                                case InstructionId.RepeScasQ:
-                                case InstructionId.RepeScasW:
-                                case InstructionId.RepneCmpsB:
-                                case InstructionId.RepneCmpsD:
-                                case InstructionId.RepneCmpsQ:
-                                case InstructionId.RepneCmpsW:
-                                case InstructionId.RepneScasB:
-                                case InstructionId.RepneScasD:
-                                case InstructionId.RepneScasQ:
-                                case InstructionId.RepneScasW:
+                                case var value when
+                                value == Inst.RepLodsB ||
+                                value == Inst.RepLodsD ||
+                                value == Inst.RepLodsQ ||
+                                value == Inst.RepLodsW ||
+                                value == Inst.RepMovsB ||
+                                value == Inst.RepMovsD ||
+                                value == Inst.RepMovsQ ||
+                                value == Inst.RepMovsW ||
+                                value == Inst.RepStosB ||
+                                value == Inst.RepStosD ||
+                                value == Inst.RepStosQ ||
+                                value == Inst.RepStosW ||
+                                value == Inst.RepeCmpsB ||
+                                value == Inst.RepeCmpsD ||
+                                value == Inst.RepeCmpsQ ||
+                                value == Inst.RepeCmpsW ||
+                                value == Inst.RepeScasB ||
+                                value == Inst.RepeScasD ||
+                                value == Inst.RepeScasQ ||
+                                value == Inst.RepeScasW ||
+                                value == Inst.RepneCmpsB ||
+                                value == Inst.RepneCmpsD ||
+                                value == Inst.RepneCmpsQ ||
+                                value == Inst.RepneCmpsW ||
+                                value == Inst.RepneScasB ||
+                                value == Inst.RepneScasD ||
+                                value == Inst.RepneScasQ ||
+                                value == Inst.RepneScasW:
                                     break;
 
-                                case InstructionId.Xrstor:
-                                case InstructionId.Xrstor64:
-                                case InstructionId.Xsave:
-                                case InstructionId.Xsave64:
-                                case InstructionId.Xsaveopt:
-                                case InstructionId.Xsaveopt64:
+                                case var value when
+                                value == Inst.Xrstor ||
+                                value == Inst.Xrstor64 ||
+                                value == Inst.Xsave ||
+                                value == Inst.Xsave64 ||
+                                value == Inst.Xsaveopt ||
+                                value == Inst.Xsaveopt64:
                                     o0 = opList[0];
                                     break;
 
-                                case InstructionId.Xgetbv:
-                                case InstructionId.Xsetbv:
+                                case var value when value == Inst.Xgetbv || value == Inst.Xsetbv:
                                     break;
 
                                 default:
@@ -231,7 +224,7 @@ namespace AsmJit.CompilerContext
                         break;
                     case CodeNodeType.Call:
                         var clnode = current.As<CallNode>();
-                        _assemblerBase.Emit(InstructionId.Call, InstructionOptions.None, clnode.Target);
+                        _assemblerBase.Emit(Inst.Call, InstructionOptions.None, clnode.Target);
                         break;
                     case CodeNodeType.CallArgument:
                         break;

@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.CompilerContext;
 
 namespace AsmJitTest.TestCases
@@ -14,8 +14,8 @@ namespace AsmJitTest.TestCases
             var dummy = c.Int32("dummy");
 
             c.Emit(
-                InstructionId.Xor, dummy, dummy,
-                InstructionId.Idiv, dummy, a, b);
+                Inst.Xor, dummy, dummy,
+                Inst.Idiv, dummy, a, b);
             c.Ret(a);
         }
 

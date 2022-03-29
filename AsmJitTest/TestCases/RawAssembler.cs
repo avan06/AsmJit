@@ -8,14 +8,14 @@ namespace AsmJitTest.TestCases
         protected override void Compile(CodeContext c)
         {
             //var R = Cpu.Registers;
-            //c.Emit(InstructionId.Push, R.Rbx);
-            //c.Emit(InstructionId.Mov, R.Eax, R.Ecx);
-            //c.Emit(InstructionId.Mov, R.Ebx, R.Edx);
-            //c.Emit(InstructionId.Lea, R.Ecx, Memory.DWord(R.Eax, R.Ebx));
-            //c.Emit(InstructionId.Lea, R.Edx, Memory.DWord(R.R8D, R.R9D));
-            //c.Emit(InstructionId.Lea, R.Ecx, Memory.DWord(R.Ecx, R.Edx));
-            //c.Emit(InstructionId.Mov, R.Eax, R.Ecx);
-            //c.Emit(InstructionId.Pop, R.Rbx);
+            //c.Emit(Inst.Push, R.Rbx);
+            //c.Emit(Inst.Mov, R.Eax, R.Ecx);
+            //c.Emit(Inst.Mov, R.Ebx, R.Edx);
+            //c.Emit(Inst.Lea, R.Ecx, Memory.DWord(R.Eax, R.Ebx));
+            //c.Emit(Inst.Lea, R.Edx, Memory.DWord(R.R8D, R.R9D));
+            //c.Emit(Inst.Lea, R.Ecx, Memory.DWord(R.Ecx, R.Edx));
+            //c.Emit(Inst.Mov, R.Eax, R.Ecx);
+            //c.Emit(Inst.Pop, R.Rbx);
             //c.Ret();
             c.Emit(@"
 Push Rbx

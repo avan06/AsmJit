@@ -8,7 +8,7 @@ namespace AsmJit.CompilerContext.CodeTree
 {
     internal class InstructionNode : CodeNode
     {
-        public readonly InstructionId InstructionId;
+        public readonly InstInfo InstructionId;
 
         public readonly InstructionOptions InstructionOptions;
 
@@ -16,7 +16,7 @@ namespace AsmJit.CompilerContext.CodeTree
 
         public int MemoryOperandIndex;
 
-        public InstructionNode(InstructionId instructionId, InstructionOptions instructionOptions, Operand[] operands) : base(CodeNodeType.Instruction)
+        public InstructionNode(InstInfo instructionId, InstructionOptions instructionOptions, Operand[] operands) : base(CodeNodeType.Instruction)
         {
             InstructionId = instructionId;
             InstructionOptions = instructionOptions;
@@ -30,6 +30,18 @@ namespace AsmJit.CompilerContext.CodeTree
             }
             Flags |= CodeNodeFlags.Removable;
         }
+
+        //internal bool IsJmp() => Flags.IsSet(CodeNodeFlags.Jmp);
+
+        //internal bool IsJcc() => Flags.IsSet(CodeNodeFlags.Jcc);
+
+        //internal bool IsJmpOrJcc() => IsJmp() || IsJcc();
+
+        //internal bool IsRet() => Flags.IsSet(CodeNodeFlags.Ret);
+
+        internal bool IsSpecial() => Flags.IsSet(CodeNodeFlags.Special);
+
+        internal bool IsFp() => Flags.IsSet(CodeNodeFlags.Fp);
 
         public override string ToString() => string.Format("[{0}] {1}: {2}, Ops={3}", FlowId == 0 ? "#" : FlowId.ToString(), Type, InstructionId, string.Join(", ", Operands.ToList().Select(o => o.ToString())));
     }

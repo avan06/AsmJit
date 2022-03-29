@@ -663,15 +663,15 @@ namespace AsmJit.CompilerContext
                     earlyPushPop = true;
                     EmitPushSequence(regsGp);
 
-                    if (_functionNode.IsStackFrameRegPreserved) _compiler.Emit(InstructionId.Push, fpReg);
+                    if (_functionNode.IsStackFrameRegPreserved) _compiler.Emit(Inst.Push, fpReg);
 
-                    _compiler.Emit(InstructionId.Mov, fpReg, Cpu.Zsp);
+                    _compiler.Emit(Inst.Mov, fpReg, Cpu.Zsp);
                 }
             }
             else
             {
-                _compiler.Emit(InstructionId.Push, fpReg);
-                _compiler.Emit(InstructionId.Mov, fpReg, Cpu.Zsp);
+                _compiler.Emit(Inst.Push, fpReg);
+                _compiler.Emit(Inst.Mov, fpReg, Cpu.Zsp);
             }
 
             if (!earlyPushPop)
@@ -685,11 +685,11 @@ namespace AsmJit.CompilerContext
             {
                 stackBase = _functionNode.AlignedMemStackSize + _functionNode.CallStackSize;
 
-                if (stackSize != 0) _compiler.Emit(InstructionId.Sub, Cpu.Zsp, (Immediate)stackSize);
+                if (stackSize != 0) _compiler.Emit(Inst.Sub, Cpu.Zsp, (Immediate)stackSize);
 
-                if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsStackMisaligned)) _compiler.Emit(InstructionId.And, Cpu.Zsp, (Immediate)(-stackAlignment));
+                if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsStackMisaligned)) _compiler.Emit(Inst.And, Cpu.Zsp, (Immediate)(-stackAlignment));
 
-                if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsStackMisaligned) && _functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsNaked)) _compiler.Emit(InstructionId.Mov, fpOffset, fpReg);
+                if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsStackMisaligned) && _functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsNaked)) _compiler.Emit(Inst.Mov, fpOffset, fpReg);
             }
             else stackBase = -(_functionNode.AlignStackSize + _functionNode.MoveStackSize);
 
@@ -698,14 +698,14 @@ namespace AsmJit.CompilerContext
             for (i = 0, mask = regsXmm; mask != 0; i++, mask >>= 1)
             {
                 if (!mask.IsSet(0x1)) continue;
-                _compiler.Emit(InstructionId.Movaps, Memory.OWordPtr(Cpu.Zsp, stackPtr), Cpu.Xmm(i));
+                _compiler.Emit(Inst.Movaps, Memory.OWordPtr(Cpu.Zsp, stackPtr), Cpu.Xmm(i));
                 stackPtr += 16;
             }
 
             for (i = 0, mask = regsMm; mask != 0; i++, mask >>= 1)
             {
                 if (!mask.IsSet(0x1)) continue;
-                _compiler.Emit(InstructionId.Movq, Memory.QWord(Cpu.Zsp, stackPtr), Cpu.Mm(i));
+                _compiler.Emit(Inst.Movq, Memory.QWord(Cpu.Zsp, stackPtr), Cpu.Mm(i));
                 stackPtr += 8;
             }
 
@@ -742,11 +742,11 @@ namespace AsmJit.CompilerContext
 
                     for (i = 0; i < numMovs; i++)
                     {
-                        _compiler.Emit(InstructionId.Mov, r[i], new Memory(mSrc).Adjust((moveIndex + i) * Cpu.Info.RegisterSize));
+                        _compiler.Emit(Inst.Mov, r[i], new Memory(mSrc).Adjust((moveIndex + i) * Cpu.Info.RegisterSize));
                     }
                     for (i = 0; i < numMovs; i++)
                     {
-                        _compiler.Emit(InstructionId.Mov, new Memory(mDst).Adjust((moveIndex + i) * Cpu.Info.RegisterSize), r[i]);
+                        _compiler.Emit(Inst.Mov, new Memory(mDst).Adjust((moveIndex + i) * Cpu.Info.RegisterSize), r[i]);
                     }
 
                     moveIndex += numMovs;
@@ -762,61 +762,61 @@ namespace AsmJit.CompilerContext
             for (i = 0, mask = regsXmm; mask != 0; i++, mask >>= 1)
             {
                 if (!mask.IsSet(0x1)) continue;
-                _compiler.Emit(InstructionId.Movaps, Cpu.Xmm(i), Memory.OWordPtr(Cpu.Zsp, stackPtr));
+                _compiler.Emit(Inst.Movaps, Cpu.Xmm(i), Memory.OWordPtr(Cpu.Zsp, stackPtr));
                 stackPtr += 16;
             }
 
             for (i = 0, mask = regsMm; mask != 0; i++, mask >>= 1)
             {
                 if (!mask.IsSet(0x1)) continue;
-                _compiler.Emit(InstructionId.Movq, Cpu.Mm(i), Memory.QWord(Cpu.Zsp, stackPtr));
+                _compiler.Emit(Inst.Movq, Cpu.Mm(i), Memory.QWord(Cpu.Zsp, stackPtr));
                 stackPtr += 8;
             }
 
             // Adjust stack.
-            if (useLeaEpilog) _compiler.Emit(InstructionId.Lea, Cpu.Zsp, Memory.Ptr(fpReg, -_functionNode.PushPopStackSize));
+            if (useLeaEpilog) _compiler.Emit(Inst.Lea, Cpu.Zsp, Memory.Ptr(fpReg, -_functionNode.PushPopStackSize));
             else if (!_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsStackMisaligned))
             {
-                if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsStackAdjusted) && stackSize != 0) _compiler.Emit(InstructionId.Add, Cpu.Zsp, (Immediate)stackSize);
+                if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsStackAdjusted) && stackSize != 0) _compiler.Emit(Inst.Add, Cpu.Zsp, (Immediate)stackSize);
             }
 
             // Restore Gp (Push/Pop).
             if (!earlyPushPop) EmitPopSequence(regsGp);
 
             // Emms.
-            if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.X86Emms)) _compiler.Emit(InstructionId.Emms);
+            if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.X86Emms)) _compiler.Emit(Inst.Emms);
 
             // MFence/SFence/LFence.
-            if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.X86SFence) & _functionNode.FunctionFlags.IsSet(FunctionNodeFlags.X86LFence)) _compiler.Emit(InstructionId.Mfence);
-            else if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.X86SFence)) _compiler.Emit(InstructionId.Sfence);
-            else if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.X86LFence)) _compiler.Emit(InstructionId.Lfence);
+            if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.X86SFence) & _functionNode.FunctionFlags.IsSet(FunctionNodeFlags.X86LFence)) _compiler.Emit(Inst.Mfence);
+            else if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.X86SFence)) _compiler.Emit(Inst.Sfence);
+            else if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.X86LFence)) _compiler.Emit(Inst.Lfence);
 
             // Leave.
             if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsNaked))
             {
                 if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.IsStackMisaligned))
                 {
-                    _compiler.Emit(InstructionId.Mov, Cpu.Zsp, fpOffset);
+                    _compiler.Emit(Inst.Mov, Cpu.Zsp, fpOffset);
 
-                    if (_functionNode.IsStackFrameRegPreserved) _compiler.Emit(InstructionId.Pop, fpReg);
+                    if (_functionNode.IsStackFrameRegPreserved) _compiler.Emit(Inst.Pop, fpReg);
 
                     if (earlyPushPop) EmitPopSequence(regsGp);
                 }
             }
             else
             {
-                if (useLeaEpilog) _compiler.Emit(InstructionId.Pop, fpReg);
-                else if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.X86Leave)) _compiler.Emit(InstructionId.Leave);
+                if (useLeaEpilog) _compiler.Emit(Inst.Pop, fpReg);
+                else if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.X86Leave)) _compiler.Emit(Inst.Leave);
                 else
                 {
-                    _compiler.Emit(InstructionId.Mov, Cpu.Zsp, fpReg);
-                    _compiler.Emit(InstructionId.Pop, fpReg);
+                    _compiler.Emit(Inst.Mov, Cpu.Zsp, fpReg);
+                    _compiler.Emit(Inst.Pop, fpReg);
                 }
             }
 
             // Emit return.
-            if (decl.CalleePopsStack) _compiler.Emit(InstructionId.Ret, (Immediate)decl.ArgumentsStackSize);
-            else _compiler.Emit(InstructionId.Ret);
+            if (decl.CalleePopsStack) _compiler.Emit(Inst.Ret, (Immediate)decl.ArgumentsStackSize);
+            else _compiler.Emit(Inst.Ret);
         }
 
         private VariableState SaveState()
@@ -1149,7 +1149,7 @@ namespace AsmJit.CompilerContext
                 var jTrampolineTarget = _compiler.CreateLabelNode();
 
                 // Add the jump to the target.
-                _codeContext.Emit(InstructionId.Jmp, new Label(jTarget.LabelId));
+                _codeContext.Emit(Inst.Jmp, new Label(jTarget.LabelId));
 
                 // Add the trampoline-label we jump to change the state.
                 extNode = _compiler.SetCurrentNode(extNode);
@@ -1348,10 +1348,10 @@ namespace AsmJit.CompilerContext
             if (Constants.X64)
             {
                 var vType = (VariableType)Math.Max((int)aVd.Type, (int)bVd.Type);
-                if (vType == VariableType.Int64 || vType == VariableType.UInt64) _compiler.Emit(InstructionId.Xchg, Cpu.Gpq(aIndex), Cpu.Gpq(bIndex));
-                else _compiler.Emit(InstructionId.Xchg, Cpu.Gpd(aIndex), Cpu.Gpd(bIndex));
+                if (vType == VariableType.Int64 || vType == VariableType.UInt64) _compiler.Emit(Inst.Xchg, Cpu.Gpq(aIndex), Cpu.Gpq(bIndex));
+                else _compiler.Emit(Inst.Xchg, Cpu.Gpd(aIndex), Cpu.Gpd(bIndex));
             }
-            else _assemblerBase.Emit(InstructionId.Xchg, Cpu.Gpd(aIndex), Cpu.Gpd(bIndex));
+            else _assemblerBase.Emit(Inst.Xchg, Cpu.Gpd(aIndex), Cpu.Gpd(bIndex));
         }
 
         private void EmitSave(VariableData vd, int regIndex)
@@ -1363,38 +1363,38 @@ namespace AsmJit.CompilerContext
                     break;
                 case VariableType.Int8:
                 case VariableType.UInt8:
-                    _compiler.Emit(InstructionId.Mov, m, Cpu.GpbLo(regIndex));
+                    _compiler.Emit(Inst.Mov, m, Cpu.GpbLo(regIndex));
                     break;
                 case VariableType.Int16:
                 case VariableType.UInt16:
-                    _compiler.Emit(InstructionId.Mov, m, Cpu.Gpw(regIndex));
+                    _compiler.Emit(Inst.Mov, m, Cpu.Gpw(regIndex));
                     break;
                 case VariableType.Int32:
                 case VariableType.UInt32:
-                    _compiler.Emit(InstructionId.Mov, m, Cpu.Gpd(regIndex));
+                    _compiler.Emit(Inst.Mov, m, Cpu.Gpd(regIndex));
                     break;
                 case VariableType.Int64:
                 case VariableType.UInt64:
-                    if (Constants.X64) _compiler.Emit(InstructionId.Mov, m, Cpu.Gpq(regIndex));
+                    if (Constants.X64) _compiler.Emit(Inst.Mov, m, Cpu.Gpq(regIndex));
                     else throw new InvalidEnumArgumentException();
                     break;
                 case VariableType.Mm:
-                    _compiler.Emit(InstructionId.Movq, m, Cpu.Mm(regIndex));
+                    _compiler.Emit(Inst.Movq, m, Cpu.Mm(regIndex));
                     break;
                 case VariableType.Xmm:
-                    _compiler.Emit(InstructionId.Movdqa, m, Cpu.Xmm(regIndex));
+                    _compiler.Emit(Inst.Movdqa, m, Cpu.Xmm(regIndex));
                     break;
                 case VariableType.XmmSs:
-                    _compiler.Emit(InstructionId.Movss, m, Cpu.Xmm(regIndex));
+                    _compiler.Emit(Inst.Movss, m, Cpu.Xmm(regIndex));
                     break;
                 case VariableType.XmmPs:
-                    _compiler.Emit(InstructionId.Movaps, m, Cpu.Xmm(regIndex));
+                    _compiler.Emit(Inst.Movaps, m, Cpu.Xmm(regIndex));
                     break;
                 case VariableType.XmmSd:
-                    _compiler.Emit(InstructionId.Movsd, m, Cpu.Xmm(regIndex));
+                    _compiler.Emit(Inst.Movsd, m, Cpu.Xmm(regIndex));
                     break;
                 case VariableType.XmmPd:
-                    _compiler.Emit(InstructionId.Movapd, m, Cpu.Xmm(regIndex));
+                    _compiler.Emit(Inst.Movapd, m, Cpu.Xmm(regIndex));
                     break;
                 default:
                     throw new InvalidEnumArgumentException();
@@ -1410,38 +1410,38 @@ namespace AsmJit.CompilerContext
                     break;
                 case VariableType.Int8:
                 case VariableType.UInt8:
-                    _compiler.Emit(InstructionId.Mov, Cpu.GpbLo(regIndex), m);
+                    _compiler.Emit(Inst.Mov, Cpu.GpbLo(regIndex), m);
                     break;
                 case VariableType.Int16:
                 case VariableType.UInt16:
-                    _compiler.Emit(InstructionId.Mov, Cpu.Gpw(regIndex), m);
+                    _compiler.Emit(Inst.Mov, Cpu.Gpw(regIndex), m);
                     break;
                 case VariableType.Int32:
                 case VariableType.UInt32:
-                    _compiler.Emit(InstructionId.Mov, Cpu.Gpd(regIndex), m);
+                    _compiler.Emit(Inst.Mov, Cpu.Gpd(regIndex), m);
                     break;
                 case VariableType.Int64:
                 case VariableType.UInt64:
-                    if (Constants.X64) _compiler.Emit(InstructionId.Mov, Cpu.Gpq(regIndex), m);
+                    if (Constants.X64) _compiler.Emit(Inst.Mov, Cpu.Gpq(regIndex), m);
                     else throw new InvalidEnumArgumentException();
                     break;
                 case VariableType.Mm:
-                    _compiler.Emit(InstructionId.Movq, Cpu.Mm(regIndex), m);
+                    _compiler.Emit(Inst.Movq, Cpu.Mm(regIndex), m);
                     break;
                 case VariableType.Xmm:
-                    _compiler.Emit(InstructionId.Movdqa, Cpu.Xmm(regIndex), m);
+                    _compiler.Emit(Inst.Movdqa, Cpu.Xmm(regIndex), m);
                     break;
                 case VariableType.XmmSs:
-                    _compiler.Emit(InstructionId.Movss, Cpu.Xmm(regIndex), m);
+                    _compiler.Emit(Inst.Movss, Cpu.Xmm(regIndex), m);
                     break;
                 case VariableType.XmmPs:
-                    _compiler.Emit(InstructionId.Movaps, Cpu.Xmm(regIndex), m);
+                    _compiler.Emit(Inst.Movaps, Cpu.Xmm(regIndex), m);
                     break;
                 case VariableType.XmmSd:
-                    _compiler.Emit(InstructionId.Movsd, Cpu.Xmm(regIndex), m);
+                    _compiler.Emit(Inst.Movsd, Cpu.Xmm(regIndex), m);
                     break;
                 case VariableType.XmmPd:
-                    _compiler.Emit(InstructionId.Movapd, Cpu.Xmm(regIndex), m);
+                    _compiler.Emit(Inst.Movapd, Cpu.Xmm(regIndex), m);
                     break;
                 default:
                     throw new InvalidEnumArgumentException();
@@ -1462,30 +1462,30 @@ namespace AsmJit.CompilerContext
                 case VariableType.UInt16:
                 case VariableType.Int32:
                 case VariableType.UInt32:
-                    _compiler.Emit(InstructionId.Mov, Cpu.Gpd(toRegIndex), Cpu.Gpd(fromRegIndex));
+                    _compiler.Emit(Inst.Mov, Cpu.Gpd(toRegIndex), Cpu.Gpd(fromRegIndex));
                     break;
                 case VariableType.Int64:
                 case VariableType.UInt64:
-                    if (Constants.X64) _compiler.Emit(InstructionId.Mov, Cpu.Gpq(toRegIndex), Cpu.Gpq(fromRegIndex));
+                    if (Constants.X64) _compiler.Emit(Inst.Mov, Cpu.Gpq(toRegIndex), Cpu.Gpq(fromRegIndex));
                     else throw new InvalidEnumArgumentException();
                     break;
                 case VariableType.Mm:
-                    _compiler.Emit(InstructionId.Movq, Cpu.Mm(toRegIndex), Cpu.Mm(fromRegIndex));
+                    _compiler.Emit(Inst.Movq, Cpu.Mm(toRegIndex), Cpu.Mm(fromRegIndex));
                     break;
                 case VariableType.Xmm:
-                    _compiler.Emit(InstructionId.Movdqa, Cpu.Xmm(toRegIndex), Cpu.Xmm(fromRegIndex));
+                    _compiler.Emit(Inst.Movdqa, Cpu.Xmm(toRegIndex), Cpu.Xmm(fromRegIndex));
                     break;
                 case VariableType.XmmSs:
-                    _compiler.Emit(InstructionId.Movss, Cpu.Xmm(toRegIndex), Cpu.Xmm(fromRegIndex));
+                    _compiler.Emit(Inst.Movss, Cpu.Xmm(toRegIndex), Cpu.Xmm(fromRegIndex));
                     break;
                 case VariableType.XmmPs:
-                    _compiler.Emit(InstructionId.Movaps, Cpu.Xmm(toRegIndex), Cpu.Xmm(fromRegIndex));
+                    _compiler.Emit(Inst.Movaps, Cpu.Xmm(toRegIndex), Cpu.Xmm(fromRegIndex));
                     break;
                 case VariableType.XmmSd:
-                    _compiler.Emit(InstructionId.Movsd, Cpu.Xmm(toRegIndex), Cpu.Xmm(fromRegIndex));
+                    _compiler.Emit(Inst.Movsd, Cpu.Xmm(toRegIndex), Cpu.Xmm(fromRegIndex));
                     break;
                 case VariableType.XmmPd:
-                    _compiler.Emit(InstructionId.Movapd, Cpu.Xmm(toRegIndex), Cpu.Xmm(fromRegIndex));
+                    _compiler.Emit(Inst.Movapd, Cpu.Xmm(toRegIndex), Cpu.Xmm(fromRegIndex));
                     break;
                 default:
                     throw new InvalidEnumArgumentException();
@@ -1505,45 +1505,45 @@ namespace AsmJit.CompilerContext
                 case VariableType.UInt8:
                     imm.TruncateTo8Bits();
                     imm.TruncateTo32Bits();
-                    _compiler.Emit(InstructionId.Mov, mem, imm);
+                    _compiler.Emit(Inst.Mov, mem, imm);
                     break;
                 case VariableType.Int16:
                 case VariableType.UInt16:
                     imm.TruncateTo16Bits();
                     imm.TruncateTo32Bits();
-                    _compiler.Emit(InstructionId.Mov, mem, imm);
+                    _compiler.Emit(Inst.Mov, mem, imm);
                     break;
                 case VariableType.Int32:
                 case VariableType.UInt32:
                     imm.TruncateTo32Bits();
-                    _compiler.Emit(InstructionId.Mov, mem, imm);
+                    _compiler.Emit(Inst.Mov, mem, imm);
                     break;
                 case VariableType.Int64:
                 case VariableType.UInt64:
-                    if (Constants.X64) _compiler.Emit(InstructionId.Mov, mem, imm);
+                    if (Constants.X64) _compiler.Emit(Inst.Mov, mem, imm);
                     else
                     {
                         var hi0 = imm.UInt32Hi;
-                        _compiler.Emit(InstructionId.Mov, mem, imm.TruncateTo32Bits());
+                        _compiler.Emit(Inst.Mov, mem, imm.TruncateTo32Bits());
                         mem.Adjust(Cpu.Info.RegisterSize);
                         imm.UInt32 = hi0;
-                        _compiler.Emit(InstructionId.Mov, mem, imm);
+                        _compiler.Emit(Inst.Mov, mem, imm);
                     }
                     break;
                 case VariableType.Fp32:
                     imm.TruncateTo32Bits();
-                    _compiler.Emit(InstructionId.Mov, mem, imm);
+                    _compiler.Emit(Inst.Mov, mem, imm);
                     break;
                 case VariableType.Fp64:
                 case VariableType.Mm:
-                    if (Constants.X64) _compiler.Emit(InstructionId.Mov, mem, imm);
+                    if (Constants.X64) _compiler.Emit(Inst.Mov, mem, imm);
                     else
                     {
                         var hi1 = imm.UInt32Hi;
-                        _compiler.Emit(InstructionId.Mov, mem, imm.TruncateTo32Bits());
+                        _compiler.Emit(Inst.Mov, mem, imm.TruncateTo32Bits());
                         mem.Adjust(Cpu.Info.RegisterSize);
                         imm.UInt32 = hi1;
-                        _compiler.Emit(InstructionId.Mov, mem, imm);
+                        _compiler.Emit(Inst.Mov, mem, imm);
                     }
                     break;
                 case VariableType.Xmm:
@@ -1556,27 +1556,27 @@ namespace AsmJit.CompilerContext
                         var hi = imm.UInt32Hi;
 
                         // Lo part.
-                        _compiler.Emit(InstructionId.Mov, mem, imm.TruncateTo32Bits());
+                        _compiler.Emit(Inst.Mov, mem, imm.TruncateTo32Bits());
                         mem.Adjust(Cpu.Info.RegisterSize);
 
                         // Hi part.
                         imm.UInt32 = hi;
-                        _compiler.Emit(InstructionId.Mov, mem, imm);
+                        _compiler.Emit(Inst.Mov, mem, imm);
                         mem.Adjust(Cpu.Info.RegisterSize);
 
                         // Zero part.
                         imm.UInt32 = 0;
-                        _compiler.Emit(InstructionId.Mov, mem, imm);
+                        _compiler.Emit(Inst.Mov, mem, imm);
                         mem.Adjust(Cpu.Info.RegisterSize);
 
-                        _compiler.Emit(InstructionId.Mov, mem, imm);
+                        _compiler.Emit(Inst.Mov, mem, imm);
                     }
                     else
                     {
-                        _compiler.Emit(InstructionId.Mov, mem, imm);
+                        _compiler.Emit(Inst.Mov, mem, imm);
                         mem.Adjust(Cpu.Info.RegisterSize);
                         imm.Int32 = 0;
-                        _compiler.Emit(InstructionId.Mov, mem, imm);
+                        _compiler.Emit(Inst.Mov, mem, imm);
                     }
                     break;
                 default:
@@ -1601,19 +1601,19 @@ namespace AsmJit.CompilerContext
                 case VariableType.UInt8:
                     imm.TruncateTo8Bits();
                     r0 = Cpu.Gpd(dstIndex);
-                    _compiler.Emit(InstructionId.Mov, r0, imm);
+                    _compiler.Emit(Inst.Mov, r0, imm);
                     break;
                 case VariableType.Int16:
                 case VariableType.UInt16:
                     imm.TruncateTo16Bits();
                     r0 = Cpu.Gpd(dstIndex);
-                    _compiler.Emit(InstructionId.Mov, r0, imm);
+                    _compiler.Emit(Inst.Mov, r0, imm);
                     break;
                 case VariableType.Int32:
                 case VariableType.UInt32:
                     imm.TruncateTo32Bits();
                     r0 = Cpu.Gpd(dstIndex);
-                    _compiler.Emit(InstructionId.Mov, r0, imm);
+                    _compiler.Emit(Inst.Mov, r0, imm);
                     break;
                 case VariableType.Int64:
                 case VariableType.UInt64:
@@ -1623,12 +1623,12 @@ namespace AsmJit.CompilerContext
                     {
                         imm.TruncateTo32Bits();
                         r0 = Cpu.Gpd(dstIndex);
-                        _compiler.Emit(InstructionId.Mov, r0, imm);
+                        _compiler.Emit(Inst.Mov, r0, imm);
                     }
                     else
                     {
                         r0 = Cpu.Gpq(dstIndex);
-                        _compiler.Emit(InstructionId.Mov, r0, imm);
+                        _compiler.Emit(Inst.Mov, r0, imm);
                     }
                     break;
                 default:
@@ -1656,7 +1656,7 @@ namespace AsmJit.CompilerContext
                     case VariableType.XmmSs:
                         if (srcType == VariableType.XmmSd || srcType == VariableType.XmmPd || srcType == VariableType.YmmPd)
                         {
-                            _compiler.Emit(InstructionId.Cvtsd2ss, Cpu.Xmm(dstIndex), Cpu.Xmm(srcIndex));
+                            _compiler.Emit(Inst.Cvtsd2ss, Cpu.Xmm(dstIndex), Cpu.Xmm(srcIndex));
                             return;
                         }
                         if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt64)
@@ -1668,7 +1668,7 @@ namespace AsmJit.CompilerContext
                     case VariableType.XmmPs:
                         if (srcType == VariableType.XmmPd || srcType == VariableType.YmmPd)
                         {
-                            _compiler.Emit(InstructionId.Cvtpd2ps, Cpu.Xmm(dstIndex), Cpu.Xmm(srcIndex));
+                            _compiler.Emit(Inst.Cvtpd2ps, Cpu.Xmm(dstIndex), Cpu.Xmm(srcIndex));
                             return;
                         }
                         type = VariableType.XmmPd;
@@ -1676,7 +1676,7 @@ namespace AsmJit.CompilerContext
                     case VariableType.XmmSd:
                         if (srcType == VariableType.XmmSs || srcType == VariableType.XmmPs || srcType == VariableType.YmmPs)
                         {
-                            _compiler.Emit(InstructionId.Cvtss2sd, Cpu.Xmm(dstIndex), Cpu.Xmm(srcIndex));
+                            _compiler.Emit(Inst.Cvtss2sd, Cpu.Xmm(dstIndex), Cpu.Xmm(srcIndex));
                             return;
                         }
                         if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt64)
@@ -1688,7 +1688,7 @@ namespace AsmJit.CompilerContext
                     case VariableType.XmmPd:
                         if (srcType == VariableType.XmmPs || srcType == VariableType.YmmPs)
                         {
-                            _compiler.Emit(InstructionId.Cvtps2pd, Cpu.Xmm(dstIndex), Cpu.Xmm(srcIndex));
+                            _compiler.Emit(Inst.Cvtps2pd, Cpu.Xmm(dstIndex), Cpu.Xmm(srcIndex));
                             return;
                         }
                         type = VariableType.XmmSd;
@@ -1705,59 +1705,59 @@ namespace AsmJit.CompilerContext
             {
                 var m0 = new Memory(dst, 4);
                 var r0 = Cpu.Gpd(srcIndex);
-                _compiler.Emit(InstructionId.Mov, m0, r0);
+                _compiler.Emit(Inst.Mov, m0, r0);
             });
             var movGpQ = new Action(() =>
             {
                 var m0 = new Memory(dst, 8);
                 var r0 = Cpu.Gpq(srcIndex);
-                _compiler.Emit(InstructionId.Mov, m0, r0);
+                _compiler.Emit(Inst.Mov, m0, r0);
             });
             var movMmD = new Action(() =>
             {
                 var m0 = new Memory(dst, 4);
                 var r0 = Cpu.Mm(srcIndex);
-                _compiler.Emit(InstructionId.Movd, m0, r0);
+                _compiler.Emit(Inst.Movd, m0, r0);
             });
             var movMmQ = new Action(() =>
             {
                 var m0 = new Memory(dst, 8);
                 var r0 = Cpu.Mm(srcIndex);
-                _compiler.Emit(InstructionId.Movd, m0, r0);
+                _compiler.Emit(Inst.Movd, m0, r0);
             });
             var movXmmD = new Action(() =>
             {
                 var m0 = new Memory(dst, 4);
                 var r0 = Cpu.Xmm(srcIndex);
-                _compiler.Emit(InstructionId.Movss, m0, r0);
+                _compiler.Emit(Inst.Movss, m0, r0);
             });
             var movXmmQ = new Action(() =>
             {
                 var m0 = new Memory(dst, 8);
                 var r0 = Cpu.Xmm(srcIndex);
-                _compiler.Emit(InstructionId.Movlps, m0, r0);
+                _compiler.Emit(Inst.Movlps, m0, r0);
             });
-            var extendMovGpD = new Action<Register, InstructionId>((r1, instId) =>
+            var extendMovGpD = new Action<Register, InstInfo>((r1, instId) =>
             {
                 var m0 = new Memory(dst, 4);
                 var r0 = Cpu.Gpd(srcIndex);
                 _compiler.Emit(instId, r0, r1);
-                _compiler.Emit(InstructionId.Mov, m0, r0);
+                _compiler.Emit(Inst.Mov, m0, r0);
             });
             var extendMovGpDq = new Action<Memory, Register>((m0, r0) =>
             {
-                _compiler.Emit(InstructionId.Mov, m0, r0);
+                _compiler.Emit(Inst.Mov, m0, r0);
                 m0.Adjust(4);
-                _compiler.Emit(InstructionId.And, m0, (Immediate)0);
+                _compiler.Emit(Inst.And, m0, (Immediate)0);
             });
-            var extendMovGpXq = new Action<Register, InstructionId>((r1, instId) =>
+            var extendMovGpXq = new Action<Register, InstInfo>((r1, instId) =>
             {
                 if (Constants.X64)
                 {
                     var m0 = new Memory(dst, 8);
                     var r0 = Cpu.Gpq(srcIndex);
                     _compiler.Emit(instId, r0, r1);
-                    _compiler.Emit(InstructionId.Mov, m0, r0);
+                    _compiler.Emit(Inst.Mov, m0, r0);
                 }
                 else
                 {
@@ -1789,7 +1789,7 @@ namespace AsmJit.CompilerContext
                 case VariableType.UInt16:
                     if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt8)
                     {
-                        extendMovGpD(Cpu.GpbLo(srcIndex), dstType == VariableType.Int16 && srcType == VariableType.Int8 ? InstructionId.Movsx : InstructionId.Movzx);
+                        extendMovGpD(Cpu.GpbLo(srcIndex), dstType == VariableType.Int16 && srcType == VariableType.Int8 ? Inst.Movsx : Inst.Movzx);
                         return;
                     }
                     if (srcType >= VariableType.Int16 && srcType <= VariableType.UInt64)
@@ -1808,12 +1808,12 @@ namespace AsmJit.CompilerContext
                 case VariableType.UInt32:
                     if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt8)
                     {
-                        extendMovGpD(Cpu.GpbLo(srcIndex), dstType == VariableType.Int32 && srcType == VariableType.Int8 ? InstructionId.Movsx : InstructionId.Movzx);
+                        extendMovGpD(Cpu.GpbLo(srcIndex), dstType == VariableType.Int32 && srcType == VariableType.Int8 ? Inst.Movsx : Inst.Movzx);
                         return;
                     }
                     if (srcType >= VariableType.Int16 && srcType <= VariableType.UInt16)
                     {
-                        extendMovGpD(Cpu.Gpw(srcIndex), dstType == VariableType.Int32 && srcType == VariableType.Int16 ? InstructionId.Movsx : InstructionId.Movzx);
+                        extendMovGpD(Cpu.Gpw(srcIndex), dstType == VariableType.Int32 && srcType == VariableType.Int16 ? Inst.Movsx : Inst.Movzx);
                         return;
                     }
                     if (srcType >= VariableType.Int32 && srcType <= VariableType.UInt64)
@@ -1832,19 +1832,19 @@ namespace AsmJit.CompilerContext
                 case VariableType.UInt64:
                     if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt8)
                     {
-                        extendMovGpXq(Cpu.GpbLo(srcIndex), dstType == VariableType.Int64 && srcType == VariableType.Int8 ? InstructionId.Movsx : InstructionId.Movzx);
+                        extendMovGpXq(Cpu.GpbLo(srcIndex), dstType == VariableType.Int64 && srcType == VariableType.Int8 ? Inst.Movsx : Inst.Movzx);
                         return;
                     }
                     if (srcType >= VariableType.Int16 && srcType <= VariableType.UInt16)
                     {
-                        extendMovGpXq(Cpu.Gpw(srcIndex), dstType == VariableType.Int32 && srcType == VariableType.Int16 ? InstructionId.Movsx : InstructionId.Movzx);
+                        extendMovGpXq(Cpu.Gpw(srcIndex), dstType == VariableType.Int32 && srcType == VariableType.Int16 ? Inst.Movsx : Inst.Movzx);
                         return;
                     }
                     if (srcType >= VariableType.Int32 && srcType <= VariableType.UInt32)
                     {
                         if (dstType == VariableType.Int64 && srcType == VariableType.Int32)
                         {
-                            extendMovGpXq(Cpu.Gpd(srcIndex), InstructionId.Movsxd);
+                            extendMovGpXq(Cpu.Gpd(srcIndex), Inst.Movsxd);
                         }
                         else
                         {
@@ -1867,12 +1867,12 @@ namespace AsmJit.CompilerContext
                 case VariableType.Mm:
                     if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt8)
                     {
-                        extendMovGpXq(Cpu.GpbLo(srcIndex), InstructionId.Movzx);
+                        extendMovGpXq(Cpu.GpbLo(srcIndex), Inst.Movzx);
                         return;
                     }
                     if (srcType >= VariableType.Int16 && srcType <= VariableType.UInt16)
                     {
-                        extendMovGpXq(Cpu.Gpw(srcIndex), InstructionId.Movzx);
+                        extendMovGpXq(Cpu.Gpw(srcIndex), Inst.Movzx);
                         return;
                     }
                     if (srcType >= VariableType.Int32 && srcType <= VariableType.UInt32)
@@ -1915,7 +1915,7 @@ namespace AsmJit.CompilerContext
                 if (regs.IsSet(0x1))
                 {
                     var gpReg = new GpRegister((GpRegisterType)Cpu.Zsp.RegisterType, i);
-                    _compiler.Emit(InstructionId.Push, gpReg);
+                    _compiler.Emit(Inst.Push, gpReg);
                 }
                 i++;
                 regs >>= 1;
@@ -1935,7 +1935,7 @@ namespace AsmJit.CompilerContext
                 if (regs.IsSet(mask))
                 {
                     var gpReg = new GpRegister((GpRegisterType)Cpu.Zsp.RegisterType, i);
-                    _compiler.Emit(InstructionId.Pop, gpReg);
+                    _compiler.Emit(Inst.Pop, gpReg);
                 }
                 mask >>= 1;
             }
@@ -2007,7 +2007,7 @@ namespace AsmJit.CompilerContext
 
                         var flags = vd.Type.GetVariableInfo().ValueFlags;
                         var ms = flags.IsSet(VariableValueFlags.Sp) ? 4 : flags.IsSet(VariableValueFlags.Dp) ? 8 : va.Flags.IsSet(VariableFlags.X86Fld4) ? 4 : 8;
-                        _codeContext.Emit(InstructionId.Fld, new Memory(GetVarMem(vd), ms));
+                        _codeContext.Emit(Inst.Fld, new Memory(GetVarMem(vd), ms));
                     }
                 }
             }
@@ -2023,12 +2023,12 @@ namespace AsmJit.CompilerContext
                     case CodeNodeType.Data:
                     case CodeNodeType.Return:
                         _compiler.SetCurrentNode(rNode);
-                        _codeContext.Emit(InstructionId.Jmp, new Label(exitTarget.LabelId));
+                        _codeContext.Emit(Inst.Jmp, new Label(exitTarget.LabelId));
                         return;
                     case CodeNodeType.Label:
                         if (node.As<LabelNode>() == exitTarget) return;
                         _compiler.SetCurrentNode(rNode);
-                        _codeContext.Emit(InstructionId.Jmp, new Label(exitTarget.LabelId));
+                        _codeContext.Emit(Inst.Jmp, new Label(exitTarget.LabelId));
                         return;
                     case CodeNodeType.Comment:
                     case CodeNodeType.Alignment:
@@ -2046,7 +2046,7 @@ namespace AsmJit.CompilerContext
                 node = node.Next;
             }
             _compiler.SetCurrentNode(rNode);
-            _codeContext.Emit(InstructionId.Jmp, new Label(exitTarget.LabelId));
+            _codeContext.Emit(Inst.Jmp, new Label(exitTarget.LabelId));
         }
 
         private static int GetDefaultAlignment(int size)

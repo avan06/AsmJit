@@ -1,4 +1,5 @@
 using System;
+using AsmJit.Common;
 using AsmJit.Common.Enums;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
@@ -23,21 +24,21 @@ namespace AsmJitTest.TestCases
             c.Bind(l2);
             c.Bind(l3);
 
-            c.Emit(InstructionId.Jmp, l1);
+            c.Emit(Inst.Jmp, l1);
 
             c.Bind(l5);
-            c.Emit(InstructionId.Mov, v0, (Immediate)0);
+            c.Emit(Inst.Mov, v0, (Immediate)0);
 
             c.Bind(l6);
             c.Emit(
-                InstructionId.Jmp, l3,
-                InstructionId.Mov, v1, (Immediate)1,
-                InstructionId.Jmp, l1);
+                Inst.Jmp, l3,
+                Inst.Mov, v1, (Immediate)1,
+                Inst.Jmp, l1);
 
             c.Bind(l4);
-            c.Emit(InstructionId.Jmp, l2);
+            c.Emit(Inst.Jmp, l2);
             c.Bind(l7);
-            c.Emit(InstructionId.Add, v0, v1);
+            c.Emit(Inst.Add, v0, v1);
 
             c.Align(AligningMode.Code, 16);
             c.Bind(l1);

@@ -479,7 +479,7 @@ namespace AsmJit.CompilerContext
             var opCount = opList.Length;
             if (opCount > 0)
             {
-                var extendedInfo = instId.GetExtendedInfo();
+                var extendedInfo = instId.ExtendedInfo;
                 SpecialInstruction[] special = null;
 
                 _variableContext.Begin();
@@ -603,7 +603,7 @@ namespace AsmJit.CompilerContext
                                 // Comparison/Test instructions don't modify any operand.
                                 else if (extendedInfo.IsTest()) combinedFlags = VariableFlags.RReg;
                                 // Imul.
-                                else if (instId == InstructionId.Imul && opCount == 3) combinedFlags = VariableFlags.WReg;
+                                else if (instId == Inst.Imul && opCount == 3) combinedFlags = VariableFlags.WReg;
                             }
                             else
                             {
@@ -611,10 +611,10 @@ namespace AsmJit.CompilerContext
                                 combinedFlags = VariableFlags.RReg;
 
                                 // Idiv is a special instruction, never handled here.
-                                if (!(instId != InstructionId.Idiv)) throw new ArgumentException();
+                                if (instId == Inst.Idiv) throw new ArgumentException();
 
                                 // Xchg/Xadd/Imul.
-                                if (extendedInfo.IsXchg() || (instId == InstructionId.Imul && opCount == 3 && i == 1)) combinedFlags = VariableFlags.RReg | VariableFlags.WReg;
+                                if (extendedInfo.IsXchg() || (instId == Inst.Imul && opCount == 3 && i == 1)) combinedFlags = VariableFlags.RReg | VariableFlags.WReg;
                             }
                             va.Flags |= combinedFlags;
                         }
@@ -742,11 +742,11 @@ namespace AsmJit.CompilerContext
             return Result.Break;
         }
         
-        private SpecialInstruction[] GetSpecialInstructions(InstructionId instId, Operand[] opList)
+        private SpecialInstruction[] GetSpecialInstructions(InstInfo instId, Operand[] opList)
         {
             switch (instId)
             {
-                case InstructionId.Cpuid:
+                case var value when value == Inst.Cpuid:
                     return new[] { //_specialInstCpuid
                         specialInsts[14],
                         specialInsts[10],
@@ -754,33 +754,33 @@ namespace AsmJit.CompilerContext
                         specialInsts[12],
                     };
 
-                case InstructionId.Cbw:
-                case InstructionId.Cdqe:
-                case InstructionId.Cwde:
-                //return _specialInstCbwCdqeCwde
-                case InstructionId.Daa:
-                case InstructionId.Das:
+                case var value when
+                value == Inst.Cbw ||
+                value == Inst.Cdqe ||
+                value == Inst.Cwde || //return _specialInstCbwCdqeCwde
+                value == Inst.Daa ||
+                value == Inst.Das:
                     return new[] { //_specialInstDaaDas
                         specialInsts[14],
                     };
 
-                case InstructionId.Cdq:
-                case InstructionId.Cwd:
-                case InstructionId.Cqo:
+                case var value when
+                value == Inst.Cdq ||
+                value == Inst.Cwd ||
+                value == Inst.Cqo:
                     return new[] { //_specialInstCdqCwdCqo
                         specialInsts[12],
                         specialInsts[3],
                     };
 
-                case InstructionId.Cmpxchg:
+                case var value when value == Inst.Cmpxchg:
                     return new[] { //_specialInstCmpxchg
                         specialInsts[14],
                         specialInsts[13],
                         specialInsts[1],
                     };
 
-                case InstructionId.Cmpxchg8b:
-                case InstructionId.Cmpxchg16b:
+                case var value when value == Inst.Cmpxchg8b || value == Inst.Cmpxchg16b:
                     return new[] { //_specialInstCmpxchg8b16b
                         specialInsts[17],
                         specialInsts[14],
@@ -788,129 +788,122 @@ namespace AsmJit.CompilerContext
                         specialInsts[4],
                     };
 
-                case InstructionId.Jecxz:
+                case var value when value == Inst.Jecxz:
                     return new[] { //_specialInstJecxz
                         specialInsts[5],
                     };
 
-                case InstructionId.Idiv:
-                case InstructionId.Div:
+                case var value when value == Inst.Idiv || value == Inst.Div:
                     return new[] { //_specialInstDiv
                         specialInsts[16],
                         specialInsts[14],
                         specialInsts[1],
                     };
 
-                case InstructionId.Imul:
-                case InstructionId.Mul:
-                    if (instId == InstructionId.Imul && opList.Length == 2) return null;
-                    if (instId == InstructionId.Imul && opList.Length == 3 && !(opList[0].IsVariable() && opList[1].IsVariable() && opList[2].IsVariableOrMemory())) return null;
+                case var value when value == Inst.Imul || value == Inst.Mul:
+                    if (instId == Inst.Imul && opList.Length == 2) return null;
+                    if (instId == Inst.Imul && opList.Length == 3 && !(opList[0].IsVariable() && opList[1].IsVariable() && opList[2].IsVariableOrMemory())) return null;
                     return new[] { //_specialInstMul
                         specialInsts[12],
                         specialInsts[14],
                         specialInsts[1],
                     };
 
-                case InstructionId.MovPtr:
+                case var value when value == Inst.MovPtr:
                     return new[] { //_specialInstMovPtr
                         specialInsts[9],
                         specialInsts[3],
                     };
 
-                case InstructionId.LodsB:
-                case InstructionId.LodsD:
-                case InstructionId.LodsQ:
-                case InstructionId.LodsW:
-                case InstructionId.RepLodsB:
-                case InstructionId.RepLodsD:
-                case InstructionId.RepLodsQ:
-                case InstructionId.RepLodsW:
+                case var value when
+                value == Inst.LodsB ||
+                value == Inst.LodsD ||
+                value == Inst.LodsQ ||
+                value == Inst.LodsW ||
+                value == Inst.RepLodsB ||
+                value == Inst.RepLodsD ||
+                value == Inst.RepLodsQ ||
+                value == Inst.RepLodsW:
                     return new[] { //_specialInstLods
                         specialInsts[9],
                         specialInsts[18],
                         specialInsts[15],
                     };
 
-                case InstructionId.CmpsB:
-                case InstructionId.CmpsD:
-                case InstructionId.CmpsQ:
-                case InstructionId.CmpsW:
-                case InstructionId.RepeCmpsB:
-                case InstructionId.RepeCmpsD:
-                case InstructionId.RepeCmpsQ:
-                case InstructionId.RepeCmpsW:
-                case InstructionId.RepneCmpsB:
-                case InstructionId.RepneCmpsD:
-                case InstructionId.RepneCmpsQ:
-                case InstructionId.RepneCmpsW:
-                //return _specialInstMovsCmps;
-                case InstructionId.MovsB:
-                case InstructionId.MovsD:
-                case InstructionId.MovsQ:
-                case InstructionId.MovsW:
-                case InstructionId.RepMovsB:
-                case InstructionId.RepMovsD:
-                case InstructionId.RepMovsQ:
-                case InstructionId.RepMovsW:
+                case var value when
+                value == Inst.CmpsB ||
+                value == Inst.CmpsD ||
+                value == Inst.CmpsQ ||
+                value == Inst.CmpsW ||
+                value == Inst.RepeCmpsB ||
+                value == Inst.RepeCmpsD ||
+                value == Inst.RepeCmpsQ ||
+                value == Inst.RepeCmpsW ||
+                value == Inst.RepneCmpsB ||
+                value == Inst.RepneCmpsD ||
+                value == Inst.RepneCmpsQ ||
+                value == Inst.RepneCmpsW || //return _specialInstMovsCmps;
+                value == Inst.MovsB ||
+                value == Inst.MovsD ||
+                value == Inst.MovsQ ||
+                value == Inst.MovsW ||
+                value == Inst.RepMovsB ||
+                value == Inst.RepMovsD ||
+                value == Inst.RepMovsQ ||
+                value == Inst.RepMovsW:
                     return new[] { //_specialInstMovsCmps
                         specialInsts[19],
                         specialInsts[18],
                         specialInsts[15],
                     };
 
-                case InstructionId.Lahf:
+                case var value when value == Inst.Lahf:
                     return new[] { //_specialInstLahf
                         specialInsts[9],
                     };
 
-                case InstructionId.Sahf:
+                case var value when value == Inst.Sahf:
                     return new[] { //_specialInstSahf
                         specialInsts[3],
                     };
 
-                case InstructionId.Maskmovq:
-                case InstructionId.Maskmovdqu:
+                case var value when value == Inst.Maskmovq || value == Inst.Maskmovdqu:
                     return new[] { //_specialInstMaskmovqMaskmovdqu
                         specialInsts[7],
                         specialInsts[1],
                         specialInsts[1],
                     };
 
-                case InstructionId.Enter:
-                case InstructionId.Leave:
-                //return null;
-                case InstructionId.Ret:
-                //return null;
-                case InstructionId.Monitor:
-                case InstructionId.Mwait:
-                //return null;
-                case InstructionId.Pop:
-                //return null;
-                case InstructionId.Popa:
-                case InstructionId.Popf:
-                //return null;
-                case InstructionId.Push:
-                //return null;
-                case InstructionId.Pusha:
-                case InstructionId.Pushf:
+                case var value when
+                value == Inst.Enter ||
+                value == Inst.Leave || //return null;
+                value == Inst.Ret || //return null;
+                value == Inst.Monitor ||
+                value == Inst.Mwait || //return null;
+                value == Inst.Pop || //return null;
+                value == Inst.Popa ||
+                value == Inst.Popf || //return null;
+                value == Inst.Push || //return null;
+                value == Inst.Pusha ||
+                value == Inst.Pushf:
                     return null;
 
-                case InstructionId.Rcl:
-                case InstructionId.Rcr:
-                case InstructionId.Rol:
-                case InstructionId.Ror:
-                case InstructionId.Sal:
-                case InstructionId.Sar:
-                case InstructionId.Shl:
-                case InstructionId.Shr:
+                case var value when
+                value == Inst.Rcl ||
+                value == Inst.Rcr ||
+                value == Inst.Rol ||
+                value == Inst.Ror ||
+                value == Inst.Sal ||
+                value == Inst.Sar ||
+                value == Inst.Shl ||
+                value == Inst.Shr:
                     if (!opList[1].IsVariable()) return null;
                     return new[] { //_specialInstRot
                         specialInsts[13],
                         specialInsts[5],
                     };
 
-                case InstructionId.Shld:
-                case InstructionId.Shrd:
+                case var value when value == Inst.Shld || value == Inst.Shrd:
                     if (!opList[2].IsVariable()) return null;
                     return new[] { //_specialInstShlrd
                         specialInsts[13],
@@ -918,75 +911,78 @@ namespace AsmJit.CompilerContext
                         specialInsts[5],
                     };
 
-                case InstructionId.Rdtsc:
-                case InstructionId.Rdtscp:
+                case var value when value == Inst.Rdtsc || value == Inst.Rdtscp:
                     return new[] { //_specialInstRdtscRdtscp
                         specialInsts[12],
                         specialInsts[9],
                         specialInsts[11],
                     };
 
-                case InstructionId.ScasB:
-                case InstructionId.ScasD:
-                case InstructionId.ScasQ:
-                case InstructionId.ScasW:
-                case InstructionId.RepeScasB:
-                case InstructionId.RepeScasD:
-                case InstructionId.RepeScasQ:
-                case InstructionId.RepeScasW:
-                case InstructionId.RepneScasB:
-                case InstructionId.RepneScasD:
-                case InstructionId.RepneScasQ:
-                case InstructionId.RepneScasW:
+                case var value when
+                value == Inst.ScasB ||
+                value == Inst.ScasD ||
+                value == Inst.ScasQ ||
+                value == Inst.ScasW ||
+                value == Inst.RepeScasB ||
+                value == Inst.RepeScasD ||
+                value == Inst.RepeScasQ ||
+                value == Inst.RepeScasW ||
+                value == Inst.RepneScasB ||
+                value == Inst.RepneScasD ||
+                value == Inst.RepneScasQ ||
+                value == Inst.RepneScasW:
                     return new[] { //_specialInstScas
                         specialInsts[19],
                         specialInsts[3],
                         specialInsts[15],
                     };
 
-                case InstructionId.StosB:
-                case InstructionId.StosD:
-                case InstructionId.StosQ:
-                case InstructionId.StosW:
-                case InstructionId.RepStosB:
-                case InstructionId.RepStosD:
-                case InstructionId.RepStosQ:
-                case InstructionId.RepStosW:
+                case var value when
+                value == Inst.StosB ||
+                value == Inst.StosD ||
+                value == Inst.StosQ ||
+                value == Inst.StosW ||
+                value == Inst.RepStosB ||
+                value == Inst.RepStosD ||
+                value == Inst.RepStosQ ||
+                value == Inst.RepStosW:
                     return new[] { //_specialInstStos
                         specialInsts[7],
                         specialInsts[3],
                         specialInsts[15],
                     };
 
-                case InstructionId.Blendvpd:
-                case InstructionId.Blendvps:
-                case InstructionId.Pblendvb:
+                case var value when
+                value == Inst.Blendvpd ||
+                value == Inst.Blendvps ||
+                value == Inst.Pblendvb:
                     return new[] { //_specialInstBlend
                         specialInsts[8],
                         specialInsts[1],
                         specialInsts[2],
                     };
 
-                case InstructionId.Xrstor:
-                case InstructionId.Xrstor64:
-                case InstructionId.Xsave:
-                case InstructionId.Xsave64:
-                case InstructionId.Xsaveopt:
-                case InstructionId.Xsaveopt64:
+                case var value when
+                value == Inst.Xrstor ||
+                value == Inst.Xrstor64 ||
+                value == Inst.Xsave ||
+                value == Inst.Xsave64 ||
+                value == Inst.Xsaveopt ||
+                value == Inst.Xsaveopt64:
                     return new[] { //_specialInstXsaveXrstor
                         specialInsts[0],
                         specialInsts[6],
                         specialInsts[3],
                     };
 
-                case InstructionId.Xgetbv:
+                case var value when value == Inst.Xgetbv:
                     return new[] { //_specialInstXgetbv
                         specialInsts[5],
                         specialInsts[12],
                         specialInsts[9],
                     };
 
-                case InstructionId.Xsetbv:
+                case var value when value == Inst.Xsetbv:
                     return new[] { //_specialInstXsetbv
                         specialInsts[5],
                         specialInsts[6],
@@ -1204,7 +1200,7 @@ namespace AsmJit.CompilerContext
             }
         }
 
-        private static void PrepareSingleVariableInstruction(InstructionId instId, VariableAttributes va)
+        private static void PrepareSingleVariableInstruction(InstInfo instId, VariableAttributes va)
         {
             switch (instId)
             {
@@ -1213,43 +1209,45 @@ namespace AsmJit.CompilerContext
                 // - sub/psub reg, reg ; Set all bits in reg to 0.
                 // - pcmpgt   reg, reg ; Set all bits in reg to 0.
                 // - pcmpeq   reg, reg ; Set all bits in reg to 1.
-                case InstructionId.Pandn:
-                case InstructionId.Xor:
-                case InstructionId.Xorpd:
-                case InstructionId.Xorps:
-                case InstructionId.Pxor:
-                case InstructionId.Sub:
-                case InstructionId.Psubb:
-                case InstructionId.Psubw:
-                case InstructionId.Psubd:
-                case InstructionId.Psubq:
-                case InstructionId.Psubsb:
-                case InstructionId.Psubsw:
-                case InstructionId.Psubusb:
-                case InstructionId.Psubusw:
-                case InstructionId.Pcmpeqb:
-                case InstructionId.Pcmpeqw:
-                case InstructionId.Pcmpeqd:
-                case InstructionId.Pcmpeqq:
-                case InstructionId.Pcmpgtb:
-                case InstructionId.Pcmpgtw:
-                case InstructionId.Pcmpgtd:
-                case InstructionId.Pcmpgtq:
+                case var value when
+                value == Inst.Pandn ||
+                value == Inst.Xor ||
+                value == Inst.Xorpd ||
+                value == Inst.Xorps ||
+                value == Inst.Pxor ||
+                value == Inst.Sub ||
+                value == Inst.Psubb ||
+                value == Inst.Psubw ||
+                value == Inst.Psubd ||
+                value == Inst.Psubq ||
+                value == Inst.Psubsb ||
+                value == Inst.Psubsw ||
+                value == Inst.Psubusb ||
+                value == Inst.Psubusw ||
+                value == Inst.Pcmpeqb ||
+                value == Inst.Pcmpeqw ||
+                value == Inst.Pcmpeqd ||
+                value == Inst.Pcmpeqq ||
+                value == Inst.Pcmpgtb ||
+                value == Inst.Pcmpgtw ||
+                value == Inst.Pcmpgtd ||
+                value == Inst.Pcmpgtq:
                     va.Flags &= ~VariableFlags.RReg;
                     break;
 
                 // - and      reg, reg ; Nop.
                 // - or       reg, reg ; Nop.
                 // - xchg     reg, reg ; Nop.
-                case InstructionId.And:
-                case InstructionId.Andpd:
-                case InstructionId.Andps:
-                case InstructionId.Pand:
-                case InstructionId.Or:
-                case InstructionId.Orpd:
-                case InstructionId.Orps:
-                case InstructionId.Por:
-                case InstructionId.Xchg:
+                case var value when
+                value == Inst.And ||
+                value == Inst.Andpd ||
+                value == Inst.Andps ||
+                value == Inst.Pand ||
+                value == Inst.Or ||
+                value == Inst.Orpd ||
+                value == Inst.Orps ||
+                value == Inst.Por ||
+                value == Inst.Xchg:
                     va.Flags &= ~VariableFlags.WReg;
                     break;
             }

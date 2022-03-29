@@ -1,6 +1,6 @@
 using System;
 using System.Globalization;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.CompilerContext;
 
 namespace AsmJitTest.TestCases
@@ -12,7 +12,7 @@ namespace AsmJitTest.TestCases
             var a = c.SetArgument(c.XmmSd("a"));
             var b = c.SetArgument(c.XmmSd("b"));
 
-            c.Emit(InstructionId.Addsd, a, b);
+            c.Emit(Inst.Addsd, a, b);
             c.Ret(a);
         }
 

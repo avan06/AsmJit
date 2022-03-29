@@ -1,7 +1,7 @@
 using System;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.Common.Operands;
-using CodeContext = AsmJit.CompilerContext.CodeContext;
+using AsmJit.CompilerContext;
 
 namespace AsmJitTest.TestCases
 {
@@ -15,18 +15,18 @@ namespace AsmJitTest.TestCases
             c.SetArgument(0, val);
 
             c.Emit(
-                InstructionId.Cmp, val, (Immediate)1,
-                InstructionId.Jle, skip);
+                Inst.Cmp, val, (Immediate)1,
+                Inst.Jle, skip);
 
             var tmp = c.Int32("tmp");
             c.Emit(
-                InstructionId.Mov, tmp, val,
-                InstructionId.Dec, tmp);
+                Inst.Mov, tmp, val,
+                Inst.Dec, tmp);
 
             var call = c.Call(c.Entry);
             call.SetArgument(0, tmp);
             call.SetReturn(0, tmp);
-            c.Emit(InstructionId.Mul, c.Int32(), val, tmp);
+            c.Emit(Inst.Mul, c.Int32(), val, tmp);
 
             c.Bind(skip);
             c.Ret(val);

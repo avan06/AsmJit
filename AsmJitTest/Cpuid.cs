@@ -1,6 +1,6 @@
 using System;
 using System.Text;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 
@@ -76,26 +76,26 @@ namespace AsmJitTest
             // Load values arguments point to (dereference IntPtr)
             c.Emit(
                 // eax = *r0
-                InstructionId.Mov, eax, X64 ? Memory.QWord(r0) : Memory.DWord(r0),
+                Inst.Mov, eax, X64 ? Memory.QWord(r0) : Memory.DWord(r0),
                 // ebx = *r1
-                InstructionId.Mov, ebx, X64 ? Memory.QWord(r1) : Memory.DWord(r1),
+                Inst.Mov, ebx, X64 ? Memory.QWord(r1) : Memory.DWord(r1),
                 // ecx = *r2
-                InstructionId.Mov, ecx, X64 ? Memory.QWord(r2) : Memory.DWord(r2),
+                Inst.Mov, ecx, X64 ? Memory.QWord(r2) : Memory.DWord(r2),
                 // edx = *r3
-                InstructionId.Mov, edx, X64 ? Memory.QWord(r3) : Memory.DWord(r3),
+                Inst.Mov, edx, X64 ? Memory.QWord(r3) : Memory.DWord(r3),
 
                 // Now execute Cpuid instruction
-                InstructionId.Cpuid, eax, ebx, ecx, edx,
+                Inst.Cpuid, eax, ebx, ecx, edx,
 
                 // Load result back into arguments addresses
                 // *r0 = eax
-                InstructionId.Mov, X64 ? Memory.QWord(r0) : Memory.DWord(r0), eax,
+                Inst.Mov, X64 ? Memory.QWord(r0) : Memory.DWord(r0), eax,
                 // *r1 = ebx
-                InstructionId.Mov, X64 ? Memory.QWord(r1) : Memory.DWord(r1), ebx,
+                Inst.Mov, X64 ? Memory.QWord(r1) : Memory.DWord(r1), ebx,
                 // *r2 = ecx
-                InstructionId.Mov, X64 ? Memory.QWord(r2) : Memory.DWord(r2), ecx,
+                Inst.Mov, X64 ? Memory.QWord(r2) : Memory.DWord(r2), ecx,
                 // *r3 = eadx
-                InstructionId.Mov, X64 ? Memory.QWord(r3) : Memory.DWord(r3), edx);
+                Inst.Mov, X64 ? Memory.QWord(r3) : Memory.DWord(r3), edx);
 
             // End return out of here :)
             c.Ret();

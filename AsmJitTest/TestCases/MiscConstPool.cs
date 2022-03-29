@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.CompilerContext;
 
 namespace AsmJitTest.TestCases
@@ -15,9 +15,9 @@ namespace AsmJitTest.TestCases
             var c1 = c.Int32Const(ConstantScope.Local, 135);
 
             c.Emit(
-                InstructionId.Mov, v0, c0,
-                InstructionId.Mov, v1, c1,
-                InstructionId.Add, v0, v1);
+                Inst.Mov, v0, c0,
+                Inst.Mov, v1, c1,
+                Inst.Add, v0, v1);
 
             c.Ret(v0);
         }

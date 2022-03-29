@@ -17,28 +17,16 @@ namespace AsmJit.Common
                 args = new Type[parameters.Length + 1];
                 parameters.CopyTo(args, 0);
             }
-            if (args == null)
-            {
-                args = new Type[] {null};
-            }
-            else
-            {
-                args[args.Length - 1] = null;
-            }
+            if (args == null) args = new Type[] { null };
+            else args[args.Length - 1] = null;
             return MakeNewCustomDelegate(args);
         }
 
         public static Type NewDelegateType(Type ret, Type[] parameters = null)
         {
-            if (!(ret != null))
-            {
-                throw new ArgumentException();
-            }
+            if (!(ret != null)) throw new ArgumentException();
             Type[] args;
-            if (parameters == null || parameters.Length == 0)
-            {
-                args = new[] {ret};
-            }
+            if (parameters == null || parameters.Length == 0) args = new[] { ret };
             else
             {
                 args = new Type[parameters.Length + 1];
@@ -48,10 +36,7 @@ namespace AsmJit.Common
             return MakeNewCustomDelegate(args);
         }
 
-        private static MethodInfo MethodInfoFromDelegateType(Type delegateType)
-        {
-            return delegateType.GetMethod("Invoke");
-        }
+        private static MethodInfo MethodInfoFromDelegateType(Type delegateType) => delegateType.GetMethod("Invoke");
 
         public static T CreateCompatibleDelegate<T>(object instance, MethodInfo method)
         {

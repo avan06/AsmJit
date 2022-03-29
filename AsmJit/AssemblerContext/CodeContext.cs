@@ -5,7 +5,6 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using AsmJit.Common;
 using AsmJit.Common.Enums;
-using AsmJit.Common.Extensions;
 using AsmJit.Common.Operands;
 
 namespace AsmJit.AssemblerContext
@@ -48,7 +47,10 @@ namespace AsmJit.AssemblerContext
 
         public void Emit(string instIdStr, params Operand[] ops)
         {
-            if (!Enum.TryParse(instIdStr, true, out InstructionId instructionId)) throw new ArgumentException(string.Format("InstructionId({0}) is invalid", instructionId), "InstructionId");
+            FieldInfo fieldInfo = typeof(Inst).GetField(instIdStr, BindingFlags.GetProperty | BindingFlags.GetField | BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy | BindingFlags.Instance);
+            if (fieldInfo == null) fieldInfo = typeof(Inst).GetField(instIdStr, BindingFlags.IgnoreCase | BindingFlags.GetProperty | BindingFlags.GetField | BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy | BindingFlags.Instance);
+            if (fieldInfo == null) throw new ArgumentException(string.Format("InstructionId({0}) is invalid", instIdStr), "InstructionId");
+            InstInfo instructionId = (InstInfo)fieldInfo.GetValue(null);
             Emit(instructionId, ops);
         }
 
@@ -63,7 +65,11 @@ namespace AsmJit.AssemblerContext
                     Int3();
                     continue;
                 }
-                if (!Enum.TryParse(insts[0], true, out InstructionId instructionId)) throw new ArgumentException(string.Format("InstructionId({0}) is invalid", insts[0]), "InstructionId");
+
+                FieldInfo fieldInfo = typeof(Inst).GetField(insts[0], BindingFlags.GetProperty | BindingFlags.GetField | BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy | BindingFlags.Instance);
+                if (fieldInfo == null) fieldInfo = typeof(Inst).GetField(insts[0], BindingFlags.IgnoreCase | BindingFlags.GetProperty | BindingFlags.GetField | BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy | BindingFlags.Instance);
+                if (fieldInfo == null) throw new ArgumentException(string.Format("InstructionId({0}) is invalid", insts[0]), "InstructionId");
+                InstInfo instructionId = (InstInfo)fieldInfo.GetValue(null);
 
                 List<Operand> ops = new List<Operand>();
                 for (int idx2 = 1; idx2 < insts.Length; idx2++)
@@ -102,7 +108,7 @@ namespace AsmJit.AssemblerContext
             Ptr,
         }
 
-        private dynamic OpParse(string opStr, bool negative = false, OpType opType = OpType.None)//, bool number = false, bool ptr = false)
+        private dynamic OpParse(string opStr, bool negative = false, OpType opType = OpType.None)
         {
             dynamic result = null;
             opStr = (opStr ?? "").Trim();
@@ -124,22 +130,22 @@ namespace AsmJit.AssemblerContext
             return result;
         }
 
-        public void Emit(InstructionId instructionId, params Operand[] ops) => Assembler.Emit(instructionId, ops);
+        public void Emit(InstInfo instructionId, params Operand[] ops) => Assembler.Emit(instructionId, ops);
 
-        public void Call(Operand o0) => Assembler.Emit(InstructionId.Call, o0);
+        public void Call(Operand o0) => Assembler.Emit(Inst.Call, o0);
 
-        public void Call(IntPtr o0) => Assembler.Emit(InstructionId.Call, (Immediate)o0.ToInt64());//Call(o0.ToInt64());
+        public void Call(IntPtr o0) => Assembler.Emit(Inst.Call, (Immediate)o0.ToInt64());//Call(o0.ToInt64());
 
-        public void Int3() => Assembler.Emit(InstructionId.Int, (Immediate)3);
+        public void Int3() => Assembler.Emit(Inst.Int, (Immediate)3);
 
-        public void Jmp(IntPtr dst) => Assembler.Emit(InstructionId.Jmp, (Immediate)dst.ToInt64());//Jmp((Immediate)dst.ToInt64());
+        public void Jmp(IntPtr dst) => Assembler.Emit(Inst.Jmp, (Immediate)dst.ToInt64());//Jmp((Immediate)dst.ToInt64());
 
-        public void Ret() => Assembler.Emit(InstructionId.Ret);
+        public void Ret() => Assembler.Emit(Inst.Ret);
 
-        public void Ret(Immediate o0) => Assembler.Emit(InstructionId.Ret, o0);
+        public void Ret(Immediate o0) => Assembler.Emit(Inst.Ret, o0);
 
-        public void Ret(long o0) => Assembler.Emit(InstructionId.Ret, (Immediate)o0);
+        public void Ret(long o0) => Assembler.Emit(Inst.Ret, (Immediate)o0);
 
-        public void Ret(ulong o0) => Assembler.Emit(InstructionId.Ret, (Immediate)o0);
+        public void Ret(ulong o0) => Assembler.Emit(Inst.Ret, (Immediate)o0);
     }
 }

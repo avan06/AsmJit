@@ -68,7 +68,7 @@ namespace AsmJit.CompilerContext
             Compiler.SetCurrentNode(node);
 
             var decl = node.FunctionDeclaration;
-            if (decl.CalleePopsStack && decl.ArgumentsStackSize != 0) Compiler.Emit(InstructionId.Sub, Cpu.Zsp, (Immediate)decl.ArgumentsStackSize);
+            if (decl.CalleePopsStack && decl.ArgumentsStackSize != 0) Compiler.Emit(Inst.Sub, Cpu.Zsp, (Immediate)decl.ArgumentsStackSize);
 
             // Clobber.
             Clobber(RegisterClass.Gp);
@@ -162,7 +162,7 @@ namespace AsmJit.CompilerContext
                 var m = va.InRegs;
                 if (rClass != RegisterClass.Gp || m != 0)
                 {
-                    if (!(m != 0)) { throw new ArgumentException(); }
+                    if (m == 0) { throw new ArgumentException(); }
                     va.InRegIndex = m.FindFirstBit();
                     willSpill |= occupied & m;
                     continue;
@@ -170,7 +170,7 @@ namespace AsmJit.CompilerContext
 
                 m = va.AllocableRegs & ~(willAlloc ^ m);
                 m = GuessAlloc(rClass, vd, m);
-                if (!(m != 0)) { throw new ArgumentException(); }
+                if (m == 0) { throw new ArgumentException(); }
 
                 var candidateRegs = m & ~occupied;
                 if (candidateRegs == 0)
@@ -221,8 +221,8 @@ namespace AsmJit.CompilerContext
                 m >>= bitIndex;
 
                 var vd = sVars[i];
-                if (!(vd != null)) throw new ArgumentException();
-                if (!(vd.Attributes == null)) throw new ArgumentException();
+                if (vd == null) throw new ArgumentException();
+                if (vd.Attributes != null) throw new ArgumentException();
 
                 if (vd.IsModified && availableRegs != 0)
                 {
@@ -460,7 +460,7 @@ namespace AsmJit.CompilerContext
                         {
                             var m = new Memory(Translator.GetVarMem(vd), (vf & VariableValueFlags.Sp) != 0 ? 4 : (vf & VariableValueFlags.Dp) != 0 ? 8 : ret.VariableType == VariableType.Fp32 ? 4 : 8);
                             Translator.Unuse(vd, RegisterClass.Xyz, VariableUsage.Mem);
-                            CodeContext.Emit(InstructionId.Fstp, m);
+                            CodeContext.Emit(Inst.Fstp, m);
                         }
                         else
                         {

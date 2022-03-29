@@ -55,6 +55,30 @@ namespace AsmJit.Common.Operands
             }
         }
 
+        internal bool IsGp() => RegisterType >= RegisterType.GpbLo && RegisterType <= RegisterType.Gpq;
+
+        internal bool IsGpb() => RegisterType >= RegisterType.GpbLo && RegisterType <= RegisterType.GpbHi;
+
+        internal bool IsGpbLo() => RegisterType == RegisterType.GpbLo;
+
+        internal bool IsGpbHi() => RegisterType == RegisterType.GpbHi;
+
+        internal bool IsGpw() => RegisterType == RegisterType.Gpw;
+
+        internal bool IsGpd() => RegisterType == RegisterType.Gpd;
+
+        internal bool IsGpq() => RegisterType == RegisterType.Gpq;
+
+        internal bool IsMm() => RegisterType == RegisterType.Mm;
+
+        internal bool IsK() => RegisterType == RegisterType.K;
+
+        internal bool IsXmm() => RegisterType == RegisterType.Xmm;
+
+        internal bool IsYmm() => RegisterType == RegisterType.Ymm;
+
+        internal bool IsZmm() => RegisterType == RegisterType.Zmm;
+
         public override string ToString() => string.Format("[{0}: Id={1}, Size={2}, Type={3}, Idx={4}]", OperandType, Id == Constants.InvalidId ? "#" : Id.ToString(), Size, RegisterType, Index == RegisterIndex.Invalid ? "#" : Index.ToString());
     }
 }

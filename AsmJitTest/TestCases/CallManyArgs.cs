@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 using AsmJit.CompilerContext.CodeTree;
@@ -25,17 +25,17 @@ namespace AsmJitTest.TestCases
             var fp = FnPointer.Fn(new Func<int, int, int, int, int, int, int, int, int, int, int>(CalledFunction));
 
             c.Emit(
-                InstructionId.Mov, fn, fp,
-                InstructionId.Mov, va, (Immediate)0x03,
-                InstructionId.Mov, vb, (Immediate)0x12,
-                InstructionId.Mov, vc, (Immediate)0xA0,
-                InstructionId.Mov, vd, (Immediate)0x0B,
-                InstructionId.Mov, ve, (Immediate)0x2F,
-                InstructionId.Mov, vf, (Immediate)0x02,
-                InstructionId.Mov, vg, (Immediate)0x0C,
-                InstructionId.Mov, vh, (Immediate)0x12,
-                InstructionId.Mov, vi, (Immediate)0x18,
-                InstructionId.Mov, vj, (Immediate)0x1E);
+                Inst.Mov, fn, fp,
+                Inst.Mov, va, (Immediate)0x03,
+                Inst.Mov, vb, (Immediate)0x12,
+                Inst.Mov, vc, (Immediate)0xA0,
+                Inst.Mov, vd, (Immediate)0x0B,
+                Inst.Mov, ve, (Immediate)0x2F,
+                Inst.Mov, vf, (Immediate)0x02,
+                Inst.Mov, vg, (Immediate)0x0C,
+                Inst.Mov, vh, (Immediate)0x12,
+                Inst.Mov, vi, (Immediate)0x18,
+                Inst.Mov, vj, (Immediate)0x1E);
 
             var call = c.Call(fn, fp);
             call.SetArgument(va, vb, vc, vd, ve, vf, vg, vh, vi, vj);

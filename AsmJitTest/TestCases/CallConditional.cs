@@ -1,5 +1,5 @@
 using System;
-using AsmJit.Common.Enums;
+using AsmJit.Common;
 using AsmJit.Common.Operands;
 using AsmJit.CompilerContext;
 using AsmJit.CompilerContext.CodeTree;
@@ -48,13 +48,13 @@ namespace AsmJitTest.TestCases
             var opAdd = c.Label();
             var opMul = c.Label();
 
-            c.Emit(InstructionId.Cmp, op, (Immediate)0);
-            c.Emit(InstructionId.Jz, opAdd);
-            c.Emit(InstructionId.Cmp, op, (Immediate)1);
-            c.Emit(InstructionId.Jz, opMul);
+            c.Emit(Inst.Cmp, op, (Immediate)0);
+            c.Emit(Inst.Jz, opAdd);
+            c.Emit(Inst.Cmp, op, (Immediate)1);
+            c.Emit(Inst.Jz, opMul);
 
             var result = c.Int32("result_0");
-            c.Emit(InstructionId.Mov, result, (Immediate)0);
+            c.Emit(Inst.Mov, result, (Immediate)0);
             c.Ret(result);
 
             c.Bind(opAdd);

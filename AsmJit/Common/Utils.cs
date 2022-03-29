@@ -62,23 +62,14 @@ namespace AsmJit.Common
             return 1 << x;
         }
 
-        internal static int Mask(int x0, int x1) => Mask(x0) | Mask(x1);
+        internal static int Mask(params int[] xs)
+        {
+            if (xs == null || xs.Length == 0 || xs.Length > 10) throw new ArgumentException();
 
-        internal static int Mask(int x0, int x1, int x2) => Mask(x0) | Mask(x1) | Mask(x2);
-
-        internal static int Mask(int x0, int x1, int x2, int x3) => Mask(x0) | Mask(x1) | Mask(x2) | Mask(x3);
-
-        internal static int Mask(int x0, int x1, int x2, int x3, int x4) => Mask(x0) | Mask(x1) | Mask(x2) | Mask(x3) | Mask(x4);
-
-        internal static int Mask(int x0, int x1, int x2, int x3, int x4, int x5) => Mask(x0) | Mask(x1) | Mask(x2) | Mask(x3) | Mask(x4) | Mask(x5);
-
-        internal static int Mask(int x0, int x1, int x2, int x3, int x4, int x5, int x6) => Mask(x0) | Mask(x1) | Mask(x2) | Mask(x3) | Mask(x4) | Mask(x5) | Mask(x6);
-
-        public static int Mask(int x0, int x1, int x2, int x3, int x4, int x5, int x6, int x7) => Mask(x0) | Mask(x1) | Mask(x2) | Mask(x3) | Mask(x4) | Mask(x5) | Mask(x6) | Mask(x7);
-
-        internal static int Mask(int x0, int x1, int x2, int x3, int x4, int x5, int x6, int x7, int x8) => Mask(x0) | Mask(x1) | Mask(x2) | Mask(x3) | Mask(x4) | Mask(x5) | Mask(x6) | Mask(x7) | Mask(x8);
-
-        internal static int Mask(int x0, int x1, int x2, int x3, int x4, int x5, int x6, int x7, int x8, int x9) => Mask(x0) | Mask(x1) | Mask(x2) | Mask(x3) | Mask(x4) | Mask(x5) | Mask(x6) | Mask(x7) | Mask(x8) | Mask(x9);
+            int result = 0;
+            for (int i = 0; i < xs.Length; i++) result |= Mask(xs[i]);
+            return result;
+        }
 
         internal static long Bits(int x)
         {

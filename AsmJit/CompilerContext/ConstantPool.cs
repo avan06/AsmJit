@@ -54,7 +54,7 @@ namespace AsmJit.CompilerContext
 
                     if (link != null)
                     {
-                        if (!(top != HeightLimit)) { throw new ArgumentException(); }
+                        if (top == HeightLimit) throw new ArgumentException();
                         stack[top++] = node;
 
                         node = link;
