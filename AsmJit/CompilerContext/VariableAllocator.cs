@@ -10,8 +10,8 @@ namespace AsmJit.CompilerContext
 {
     internal sealed class VariableAllocator : Allocator
     {
-        private RegisterMask _willAlloc = new RegisterMask();
-        private RegisterMask _willSpill = new RegisterMask();
+        private readonly RegisterMask _willAlloc = new RegisterMask();
+        private readonly RegisterMask _willSpill = new RegisterMask();
 
         public VariableAllocator(Compiler compiler, CodeContext codeContext, Translator translator, VariableContext ctx) : base(compiler, codeContext, translator, ctx) { }
 
@@ -70,11 +70,11 @@ namespace AsmJit.CompilerContext
                 var cVd = carg.Conv;
 
                 // Convert first.
-                if (!(sVd.RegisterIndex != RegisterIndex.Invalid)) { throw new ArgumentException(); }
+                if (sVd.RegisterIndex == RegisterIndex.Invalid) throw new ArgumentException();
 
                 if (cVd != null)
                 {
-                    if (!(cVd.RegisterIndex != RegisterIndex.Invalid)) { throw new ArgumentException(); }
+                    if (cVd.RegisterIndex == RegisterIndex.Invalid) throw new ArgumentException();
                     Translator.EmitConvertVarToVar(cVd.Type, cVd.RegisterIndex, sVd.Type, sVd.RegisterIndex);
                     sVd = cVd;
                 }
@@ -84,7 +84,7 @@ namespace AsmJit.CompilerContext
                     if (argMask.IsSet(0x1))
                     {
                         var arg = decl.GetArgument(argIndex);
-                        if (!(arg.StackOffset != Constants.InvalidValue)) { throw new ArgumentException(); }
+                        if (arg.StackOffset == Constants.InvalidValue) throw new ArgumentException();
 
                         var dst = Memory.Ptr(Cpu.Zsp, -Cpu.Info.RegisterSize + arg.StackOffset);
                         Translator.EmitMoveVarOnStack(arg.VariableType, dst, sVd.Type, sVd.RegisterIndex);
@@ -198,7 +198,7 @@ namespace AsmJit.CompilerContext
                                 if (mandatoryRegs.IsSet(regMask))
                                 {
                                     // Case 'a' - 'willAlloc' contains initially all inRegs from all VarAttr's.
-                                    if (!((willAlloc & regMask) != 0)) { throw new ArgumentException(); }
+                                    if ((willAlloc & regMask) == 0) throw new ArgumentException();
                                 }
                                 else
                                 {
@@ -221,7 +221,7 @@ namespace AsmJit.CompilerContext
                                 if (mandatoryRegs.IsSet(regMask))
                                 {
                                     // Case 'a' - 'willAlloc' contains initially all inRegs from all VarAttr's.
-                                    if (!((willAlloc & regMask) != 0)) { throw new ArgumentException(); }
+                                    if ((willAlloc & regMask) == 0) throw new ArgumentException();
                                 }
                                 else
                                 {
@@ -314,7 +314,7 @@ namespace AsmJit.CompilerContext
 
                     m = va.AllocableRegs & ~(willAlloc ^ m);
                     m = GuessAlloc(vd, m, rClass);
-                    if (!(m != 0)) { throw new ArgumentException(); }
+                    if (m == 0) throw new ArgumentException();
 
                     var candidateRegs = m & ~occupied;
                     var homeMask = vd.HomeMask;
@@ -387,7 +387,7 @@ namespace AsmJit.CompilerContext
                 var vd = sVars[i];
                 var va = vd.Attributes;
 
-                if (!(va == null || !va.Flags.IsSet(VariableFlags.XReg))) { throw new ArgumentException(); }
+                if (va != null && va.Flags.IsSet(VariableFlags.XReg)) throw new ArgumentException();
 
                 if (vd.IsModified && availableRegs != 0)
                 {
@@ -431,7 +431,7 @@ namespace AsmJit.CompilerContext
                     var bIndex = aVa.InRegIndex;
 
                     // Shouldn't be the same.
-                    if (!(aIndex != bIndex)) { throw new ArgumentException(); }
+                    if (aIndex == bIndex) throw new ArgumentException();
 
                     var bVd = state.GetListByClass(rClass)[bIndex];
                     if (bVd != null)
@@ -486,11 +486,11 @@ namespace AsmJit.CompilerContext
                 if ((va.Flags & (VariableFlags.XReg | VariableFlags.AllocWDone)) != VariableFlags.WReg) continue;
 
                 var regIndex = va.OutRegIndex;
-                if (!(regIndex != RegisterIndex.Invalid)) { throw new ArgumentException(); }
+                if (regIndex == RegisterIndex.Invalid) throw new ArgumentException();
 
                 if (vd.RegisterIndex != regIndex)
                 {
-                    if (!(state.GetListByClass(rClass)[regIndex] == null)) { throw new ArgumentException(); }
+                    if (state.GetListByClass(rClass)[regIndex] != null) throw new ArgumentException();
                     Translator.Attach(vd, rClass, regIndex, false);
                 }
 
@@ -521,7 +521,7 @@ namespace AsmJit.CompilerContext
 
         private int GuessAlloc(VariableData vd, int allocableRegs, RegisterClass rClass)
         {
-            if (!(allocableRegs != 0)) { throw new ArgumentException(); }
+            if (allocableRegs == 0) throw new ArgumentException();
 
             if (allocableRegs.IsPowerOf2()) return allocableRegs;
 
@@ -551,7 +551,7 @@ namespace AsmJit.CompilerContext
                 }
 
                 node = node.Next;
-                if (node == null) { throw new ArgumentException(); }
+                if (node == null) throw new ArgumentException();
 
                 var map = node.VariableMap;
                 if (map == null) continue;
@@ -595,7 +595,7 @@ namespace AsmJit.CompilerContext
 
         private int GuessSpill(VariableData vd, int allocableRegs, RegisterClass rClass)
         {
-            if (allocableRegs == 0) { throw new ArgumentException(); }
+            if (allocableRegs == 0) throw new ArgumentException();
             return 0;
         }
     }

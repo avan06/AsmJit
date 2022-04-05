@@ -710,7 +710,6 @@ namespace AsmJit.CompilerContext
             }
 
             // [Move-Args]
-
             if (_functionNode.FunctionFlags.IsSet(FunctionNodeFlags.X86MoveArgs))
             {
                 var argStackSize = decl.ArgumentsStackSize;
@@ -1202,10 +1201,7 @@ namespace AsmJit.CompilerContext
             if (vd.State != VariableUsage.Reg) return;
             var regIndex = vd.RegisterIndex;
             if (regIndex == RegisterIndex.Invalid || _variableContext.State.GetListByClass(rClass)[regIndex] != vd) throw new ArgumentException();
-            if (vd.IsModified)
-            {
-                EmitSave(vd, regIndex);
-            }
+            if (vd.IsModified) EmitSave(vd, regIndex);
             Detach(vd, rClass, regIndex, VariableUsage.Mem);
         }
 
@@ -1773,124 +1769,45 @@ namespace AsmJit.CompilerContext
                     break;
                 case VariableType.Int8:
                 case VariableType.UInt8:
-                    if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt64)
-                    {
-                        movGpD();
-                        return;
-                    }
-                    if (srcType == VariableType.Mm)
-                    {
-                        movMmD();
-                        return;
-                    }
-                    if (srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd) movXmmD();
+                    if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt64) movGpD();
+                    else if (srcType == VariableType.Mm) movMmD();
+                    else if(srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd) movXmmD();
                     break;
                 case VariableType.Int16:
                 case VariableType.UInt16:
-                    if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt8)
-                    {
-                        extendMovGpD(Cpu.GpbLo(srcIndex), dstType == VariableType.Int16 && srcType == VariableType.Int8 ? Inst.Movsx : Inst.Movzx);
-                        return;
-                    }
-                    if (srcType >= VariableType.Int16 && srcType <= VariableType.UInt64)
-                    {
-                        movGpD();
-                        return;
-                    }
-                    if (srcType == VariableType.Mm)
-                    {
-                        movMmD();
-                        return;
-                    }
-                    if (srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd) movXmmD();
+                    if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt8) extendMovGpD(Cpu.GpbLo(srcIndex), dstType == VariableType.Int16 && srcType == VariableType.Int8 ? Inst.Movsx : Inst.Movzx);
+                    else if(srcType >= VariableType.Int16 && srcType <= VariableType.UInt64) movGpD();
+                    else if(srcType == VariableType.Mm) movMmD();
+                    else if(srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd) movXmmD();
                     break;
                 case VariableType.Int32:
                 case VariableType.UInt32:
-                    if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt8)
-                    {
-                        extendMovGpD(Cpu.GpbLo(srcIndex), dstType == VariableType.Int32 && srcType == VariableType.Int8 ? Inst.Movsx : Inst.Movzx);
-                        return;
-                    }
-                    if (srcType >= VariableType.Int16 && srcType <= VariableType.UInt16)
-                    {
-                        extendMovGpD(Cpu.Gpw(srcIndex), dstType == VariableType.Int32 && srcType == VariableType.Int16 ? Inst.Movsx : Inst.Movzx);
-                        return;
-                    }
-                    if (srcType >= VariableType.Int32 && srcType <= VariableType.UInt64)
-                    {
-                        movGpD();
-                        return;
-                    }
-                    if (srcType == VariableType.Mm)
-                    {
-                        movMmD();
-                        return;
-                    }
-                    if (srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd) movXmmD();
+                    if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt8) extendMovGpD(Cpu.GpbLo(srcIndex), dstType == VariableType.Int32 && srcType == VariableType.Int8 ? Inst.Movsx : Inst.Movzx);
+                    else if(srcType >= VariableType.Int16 && srcType <= VariableType.UInt16) extendMovGpD(Cpu.Gpw(srcIndex), dstType == VariableType.Int32 && srcType == VariableType.Int16 ? Inst.Movsx : Inst.Movzx);
+                    else if(srcType >= VariableType.Int32 && srcType <= VariableType.UInt64) movGpD();
+                    else if (srcType == VariableType.Mm) movMmD();
+                    else if(srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd) movXmmD();
                     break;
                 case VariableType.Int64:
                 case VariableType.UInt64:
-                    if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt8)
+                    if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt8) extendMovGpXq(Cpu.GpbLo(srcIndex), dstType == VariableType.Int64 && srcType == VariableType.Int8 ? Inst.Movsx : Inst.Movzx);
+                    else if(srcType >= VariableType.Int16 && srcType <= VariableType.UInt16) extendMovGpXq(Cpu.Gpw(srcIndex), dstType == VariableType.Int32 && srcType == VariableType.Int16 ? Inst.Movsx : Inst.Movzx);
+                    else if (srcType >= VariableType.Int32 && srcType <= VariableType.UInt32)
                     {
-                        extendMovGpXq(Cpu.GpbLo(srcIndex), dstType == VariableType.Int64 && srcType == VariableType.Int8 ? Inst.Movsx : Inst.Movzx);
-                        return;
+                        if (dstType == VariableType.Int64 && srcType == VariableType.Int32) extendMovGpXq(Cpu.Gpd(srcIndex), Inst.Movsxd);
+                        else extendMovGpDq(new Memory(dst, 4), Cpu.Gpd(srcIndex));
                     }
-                    if (srcType >= VariableType.Int16 && srcType <= VariableType.UInt16)
-                    {
-                        extendMovGpXq(Cpu.Gpw(srcIndex), dstType == VariableType.Int32 && srcType == VariableType.Int16 ? Inst.Movsx : Inst.Movzx);
-                        return;
-                    }
-                    if (srcType >= VariableType.Int32 && srcType <= VariableType.UInt32)
-                    {
-                        if (dstType == VariableType.Int64 && srcType == VariableType.Int32)
-                        {
-                            extendMovGpXq(Cpu.Gpd(srcIndex), Inst.Movsxd);
-                        }
-                        else
-                        {
-                            extendMovGpDq(new Memory(dst, 4), Cpu.Gpd(srcIndex));
-                        }
-                        return;
-                    }
-                    if (srcType >= VariableType.Int64 && srcType <= VariableType.UInt64)
-                    {
-                        movGpQ();
-                        return;
-                    }
-                    if (srcType == VariableType.Mm)
-                    {
-                        movMmQ();
-                        return;
-                    }
-                    if (srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd) movXmmQ();
+                    else if (srcType >= VariableType.Int64 && srcType <= VariableType.UInt64) movGpQ();
+                    else if (srcType == VariableType.Mm) movMmQ();
+                    else if (srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd) movXmmQ();
                     break;
                 case VariableType.Mm:
-                    if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt8)
-                    {
-                        extendMovGpXq(Cpu.GpbLo(srcIndex), Inst.Movzx);
-                        return;
-                    }
-                    if (srcType >= VariableType.Int16 && srcType <= VariableType.UInt16)
-                    {
-                        extendMovGpXq(Cpu.Gpw(srcIndex), Inst.Movzx);
-                        return;
-                    }
-                    if (srcType >= VariableType.Int32 && srcType <= VariableType.UInt32)
-                    {
-                        extendMovGpDq(new Memory(dst), Cpu.Gpd(srcIndex));
-                        return;
-                    }
-                    if (srcType >= VariableType.Int64 && srcType <= VariableType.UInt64)
-                    {
-                        movGpQ();
-                        return;
-                    }
-                    if (srcType == VariableType.Mm)
-                    {
-                        movMmQ();
-                        return;
-                    }
-                    if (srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd) movXmmQ();
+                    if (srcType >= VariableType.Int8 && srcType <= VariableType.UInt8) extendMovGpXq(Cpu.GpbLo(srcIndex), Inst.Movzx);
+                    else if (srcType >= VariableType.Int16 && srcType <= VariableType.UInt16) extendMovGpXq(Cpu.Gpw(srcIndex), Inst.Movzx);
+                    else if (srcType >= VariableType.Int32 && srcType <= VariableType.UInt32) extendMovGpDq(new Memory(dst), Cpu.Gpd(srcIndex));
+                    else if (srcType >= VariableType.Int64 && srcType <= VariableType.UInt64) movGpQ();
+                    else if (srcType == VariableType.Mm) movMmQ();
+                    else if (srcType >= VariableType.Xmm && srcType <= VariableType.XmmPd) movXmmQ();
                     break;
                 case VariableType.Fp32:
                 case VariableType.XmmSs:

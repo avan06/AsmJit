@@ -142,7 +142,6 @@ namespace AsmJit.CompilerContext
             if (_node.IsFetched())
             {
                 RemoveUnreachableCode();
-
                 return _variableContext;
             }
             _functionNode.Exit.FlowId = ++flowId;
@@ -755,10 +754,10 @@ namespace AsmJit.CompilerContext
                     };
 
                 case var value when
-                value == Inst.Cbw ||
+                value == Inst.Cbw  ||
                 value == Inst.Cdqe ||
                 value == Inst.Cwde || //return _specialInstCbwCdqeCwde
-                value == Inst.Daa ||
+                value == Inst.Daa  ||
                 value == Inst.Das:
                     return new[] { //_specialInstDaaDas
                         specialInsts[14],
@@ -816,10 +815,10 @@ namespace AsmJit.CompilerContext
                     };
 
                 case var value when
-                value == Inst.LodsB ||
-                value == Inst.LodsD ||
-                value == Inst.LodsQ ||
-                value == Inst.LodsW ||
+                value == Inst.LodsB    ||
+                value == Inst.LodsD    ||
+                value == Inst.LodsQ    ||
+                value == Inst.LodsW    ||
                 value == Inst.RepLodsB ||
                 value == Inst.RepLodsD ||
                 value == Inst.RepLodsQ ||
@@ -831,25 +830,25 @@ namespace AsmJit.CompilerContext
                     };
 
                 case var value when
-                value == Inst.CmpsB ||
-                value == Inst.CmpsD ||
-                value == Inst.CmpsQ ||
-                value == Inst.CmpsW ||
-                value == Inst.RepeCmpsB ||
-                value == Inst.RepeCmpsD ||
-                value == Inst.RepeCmpsQ ||
-                value == Inst.RepeCmpsW ||
+                value == Inst.CmpsB      ||
+                value == Inst.CmpsD      ||
+                value == Inst.CmpsQ      ||
+                value == Inst.CmpsW      ||
+                value == Inst.RepeCmpsB  ||
+                value == Inst.RepeCmpsD  ||
+                value == Inst.RepeCmpsQ  ||
+                value == Inst.RepeCmpsW  ||
                 value == Inst.RepneCmpsB ||
                 value == Inst.RepneCmpsD ||
                 value == Inst.RepneCmpsQ ||
                 value == Inst.RepneCmpsW || //return _specialInstMovsCmps;
-                value == Inst.MovsB ||
-                value == Inst.MovsD ||
-                value == Inst.MovsQ ||
-                value == Inst.MovsW ||
-                value == Inst.RepMovsB ||
-                value == Inst.RepMovsD ||
-                value == Inst.RepMovsQ ||
+                value == Inst.MovsB      ||
+                value == Inst.MovsD      ||
+                value == Inst.MovsQ      ||
+                value == Inst.MovsW      ||
+                value == Inst.RepMovsB   ||
+                value == Inst.RepMovsD   ||
+                value == Inst.RepMovsQ   ||
                 value == Inst.RepMovsW:
                     return new[] { //_specialInstMovsCmps
                         specialInsts[19],
@@ -875,16 +874,16 @@ namespace AsmJit.CompilerContext
                     };
 
                 case var value when
-                value == Inst.Enter ||
-                value == Inst.Leave || //return null;
-                value == Inst.Ret || //return null;
+                value == Inst.Enter   ||
+                value == Inst.Leave   || //return null;
+                value == Inst.Ret     || //return null;
                 value == Inst.Monitor ||
-                value == Inst.Mwait || //return null;
-                value == Inst.Pop || //return null;
-                value == Inst.Popa ||
-                value == Inst.Popf || //return null;
-                value == Inst.Push || //return null;
-                value == Inst.Pusha ||
+                value == Inst.Mwait   || //return null;
+                value == Inst.Pop     || //return null;
+                value == Inst.Popa    ||
+                value == Inst.Popf    || //return null;
+                value == Inst.Push    || //return null;
+                value == Inst.Pusha   ||
                 value == Inst.Pushf:
                     return null;
 
@@ -919,14 +918,14 @@ namespace AsmJit.CompilerContext
                     };
 
                 case var value when
-                value == Inst.ScasB ||
-                value == Inst.ScasD ||
-                value == Inst.ScasQ ||
-                value == Inst.ScasW ||
-                value == Inst.RepeScasB ||
-                value == Inst.RepeScasD ||
-                value == Inst.RepeScasQ ||
-                value == Inst.RepeScasW ||
+                value == Inst.ScasB      ||
+                value == Inst.ScasD      ||
+                value == Inst.ScasQ      ||
+                value == Inst.ScasW      ||
+                value == Inst.RepeScasB  ||
+                value == Inst.RepeScasD  ||
+                value == Inst.RepeScasQ  ||
+                value == Inst.RepeScasW  ||
                 value == Inst.RepneScasB ||
                 value == Inst.RepneScasD ||
                 value == Inst.RepneScasQ ||
@@ -938,10 +937,10 @@ namespace AsmJit.CompilerContext
                     };
 
                 case var value when
-                value == Inst.StosB ||
-                value == Inst.StosD ||
-                value == Inst.StosQ ||
-                value == Inst.StosW ||
+                value == Inst.StosB    ||
+                value == Inst.StosD    ||
+                value == Inst.StosQ    ||
+                value == Inst.StosW    ||
                 value == Inst.RepStosB ||
                 value == Inst.RepStosD ||
                 value == Inst.RepStosQ ||
@@ -963,10 +962,10 @@ namespace AsmJit.CompilerContext
                     };
 
                 case var value when
-                value == Inst.Xrstor ||
+                value == Inst.Xrstor   ||
                 value == Inst.Xrstor64 ||
-                value == Inst.Xsave ||
-                value == Inst.Xsave64 ||
+                value == Inst.Xsave    ||
+                value == Inst.Xsave64  ||
                 value == Inst.Xsaveopt ||
                 value == Inst.Xsaveopt64:
                     return new[] { //_specialInstXsaveXrstor
@@ -1009,43 +1008,43 @@ namespace AsmJit.CompilerContext
             }
             return Result.Break;
         }
+
+        //private Result NextGroup(Result result)
+        //{
+        //    for (; ; )
+        //    {
+        //        if ((result == Result.Do || result == Result.Break) && !_node.IsFetched())
+        //        {
+        //            break;
+        //        }
+        //        if (!CheckNextGroup())
+        //        {
+        //            return Result.Done;
+        //        }
+        //        _node = GetOppositeJccFlow(_variableContext.JccList[_jLinkIndex].As<JumpNode>());
+        //        result = Result.Do;
+        //    }
+        //    return Result.Switch;
+        //}
         //
-        //		private Result NextGroup(Result result)
-        //		{
-        //			for (;;)
-        //			{
-        //				if ((result == Result.Do || result == Result.Break) && !_node.IsFetched())
-        //				{
-        //					break;
-        //				}
-        //				if (!CheckNextGroup())
-        //				{
-        //					return Result.Done;
-        //				}
-        //				_node = GetOppositeJccFlow(_variableContext.JccList[_jLinkIndex].As<JumpNode>());
-        //				result = Result.Do;
-        //			}
-        //			return Result.Switch;
-        //		}
-        //
-        //		private bool CheckNextGroup()
-        //		{
-        //			if (_jLinkIndex == -1)
-        //			{
-        //				_jLinkIndex = 0;
-        //			}
-        //			else
-        //			{
-        //				_jLinkIndex++;
-        //			}			
-        //			if (_jLinkIndex >= _variableContext.JccList.Count)
-        //			{
-        //				_node = null;
-        //				return false;
-        //			}
-        //			_node = GetOppositeJccFlow(_variableContext.JccList[_jLinkIndex].As<JumpNode>());
-        //			return true;
-        //		}
+        //private bool CheckNextGroup()
+        //{
+        //    if (_jLinkIndex == -1)
+        //    {
+        //        _jLinkIndex = 0;
+        //    }
+        //    else
+        //    {
+        //        _jLinkIndex++;
+        //    }
+        //    if (_jLinkIndex >= _variableContext.JccList.Count)
+        //    {
+        //        _node = null;
+        //        return false;
+        //    }
+        //    _node = GetOppositeJccFlow(_variableContext.JccList[_jLinkIndex].As<JumpNode>());
+        //    return true;
+        //}
 
         private static CodeNode GetOppositeJccFlow(JumpNode jump) => jump.Flags.IsSet(CodeNodeFlags.Taken) ? jump.Next : jump.Target;
 
@@ -1210,18 +1209,18 @@ namespace AsmJit.CompilerContext
                 // - pcmpgt   reg, reg ; Set all bits in reg to 0.
                 // - pcmpeq   reg, reg ; Set all bits in reg to 1.
                 case var value when
-                value == Inst.Pandn ||
-                value == Inst.Xor ||
-                value == Inst.Xorpd ||
-                value == Inst.Xorps ||
-                value == Inst.Pxor ||
-                value == Inst.Sub ||
-                value == Inst.Psubb ||
-                value == Inst.Psubw ||
-                value == Inst.Psubd ||
-                value == Inst.Psubq ||
-                value == Inst.Psubsb ||
-                value == Inst.Psubsw ||
+                value == Inst.Pandn   ||
+                value == Inst.Xor     ||
+                value == Inst.Xorpd   ||
+                value == Inst.Xorps   ||
+                value == Inst.Pxor    ||
+                value == Inst.Sub     ||
+                value == Inst.Psubb   ||
+                value == Inst.Psubw   ||
+                value == Inst.Psubd   ||
+                value == Inst.Psubq   ||
+                value == Inst.Psubsb  ||
+                value == Inst.Psubsw  ||
                 value == Inst.Psubusb ||
                 value == Inst.Psubusw ||
                 value == Inst.Pcmpeqb ||
@@ -1239,14 +1238,14 @@ namespace AsmJit.CompilerContext
                 // - or       reg, reg ; Nop.
                 // - xchg     reg, reg ; Nop.
                 case var value when
-                value == Inst.And ||
+                value == Inst.And   ||
                 value == Inst.Andpd ||
                 value == Inst.Andps ||
-                value == Inst.Pand ||
-                value == Inst.Or ||
-                value == Inst.Orpd ||
-                value == Inst.Orps ||
-                value == Inst.Por ||
+                value == Inst.Pand  ||
+                value == Inst.Or    ||
+                value == Inst.Orpd  ||
+                value == Inst.Orps  ||
+                value == Inst.Por   ||
                 value == Inst.Xchg:
                     va.Flags &= ~VariableFlags.WReg;
                     break;

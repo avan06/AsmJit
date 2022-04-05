@@ -24,7 +24,7 @@ namespace AsmJit.Common
 
         public static Type NewDelegateType(Type ret, Type[] parameters = null)
         {
-            if (!(ret != null)) throw new ArgumentException();
+            if (ret == null) throw new ArgumentException();
             Type[] args;
             if (parameters == null || parameters.Length == 0) args = new[] { ret };
             else

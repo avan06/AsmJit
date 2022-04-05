@@ -11,11 +11,11 @@ namespace AsmJit.CompilerContext
 {
     public class CompilerBase : IDisposable
     {
-        private List<VariableData> _variables = new List<VariableData>();
+        private readonly List<VariableData> _variables = new List<VariableData>();
         protected Label _localConstPoolLabel;
         protected Label _globalConstPoolLabel;
 
-        private Dictionary<int, LabelNode> labelNodes = new Dictionary<int, LabelNode>();
+        private readonly Dictionary<int, LabelNode> labelNodes = new Dictionary<int, LabelNode>();
         protected List<Pointer> _dataAllocations = new List<Pointer>();
         protected List<DataBlock> _data = new List<DataBlock>();
         protected CodeNode _firstNode;
@@ -67,7 +67,7 @@ namespace AsmJit.CompilerContext
             return _variables[id];
         }
 
-        internal void AddNode(CodeNode node)
+        internal T AddNode<T>(T node) where T : CodeNode
         {
             if (node == null) throw new ArgumentException("CodeNode is null");
             if (node.Previous != null || node.Next != null) throw new ArgumentException("Node already inserted");
@@ -99,6 +99,7 @@ namespace AsmJit.CompilerContext
                 else _lastNode = node;
             }
             _currentNode = node;
+            return node;
         }
 
         internal void AddNodeBefore(CodeNode node, CodeNode @ref)
@@ -210,8 +211,7 @@ namespace AsmJit.CompilerContext
                 AddNode(node);
                 return;
             }
-            var inst = new InstructionNode(instructionId, options, operands);
-            AddNode(inst);
+            var inst = AddNode(new InstructionNode(instructionId, options, operands));
         }
 
         internal TV CreateVariable<TV>(VariableType type, string name = null) where TV : Variable

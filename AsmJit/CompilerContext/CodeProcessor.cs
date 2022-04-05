@@ -55,10 +55,10 @@ namespace AsmJit.CompilerContext
                                     break;
 
                                 case var value when
-                                value == Inst.Cbw ||
-                                value == Inst.Cdq ||
+                                value == Inst.Cbw  ||
+                                value == Inst.Cdq  ||
                                 value == Inst.Cdqe ||
-                                value == Inst.Cwd ||
+                                value == Inst.Cwd  ||
                                 value == Inst.Cwde ||
                                 value == Inst.Cqo:
                                     break;
@@ -77,7 +77,7 @@ namespace AsmJit.CompilerContext
 
                                 case var value when
                                 value == Inst.Imul ||
-                                value == Inst.Mul ||
+                                value == Inst.Mul  ||
                                 value == Inst.Idiv ||
                                 value == Inst.Div:
                                     // Assume "Mul/Div dst_hi (implicit), dst_lo (implicit), src (explicit)".
@@ -148,26 +148,26 @@ namespace AsmJit.CompilerContext
                                     break;
 
                                 case var value when
-                                value == Inst.RepLodsB ||
-                                value == Inst.RepLodsD ||
-                                value == Inst.RepLodsQ ||
-                                value == Inst.RepLodsW ||
-                                value == Inst.RepMovsB ||
-                                value == Inst.RepMovsD ||
-                                value == Inst.RepMovsQ ||
-                                value == Inst.RepMovsW ||
-                                value == Inst.RepStosB ||
-                                value == Inst.RepStosD ||
-                                value == Inst.RepStosQ ||
-                                value == Inst.RepStosW ||
-                                value == Inst.RepeCmpsB ||
-                                value == Inst.RepeCmpsD ||
-                                value == Inst.RepeCmpsQ ||
-                                value == Inst.RepeCmpsW ||
-                                value == Inst.RepeScasB ||
-                                value == Inst.RepeScasD ||
-                                value == Inst.RepeScasQ ||
-                                value == Inst.RepeScasW ||
+                                value == Inst.RepLodsB   ||
+                                value == Inst.RepLodsD   ||
+                                value == Inst.RepLodsQ   ||
+                                value == Inst.RepLodsW   ||
+                                value == Inst.RepMovsB   ||
+                                value == Inst.RepMovsD   ||
+                                value == Inst.RepMovsQ   ||
+                                value == Inst.RepMovsW   ||
+                                value == Inst.RepStosB   ||
+                                value == Inst.RepStosD   ||
+                                value == Inst.RepStosQ   ||
+                                value == Inst.RepStosW   ||
+                                value == Inst.RepeCmpsB  ||
+                                value == Inst.RepeCmpsD  ||
+                                value == Inst.RepeCmpsQ  ||
+                                value == Inst.RepeCmpsW  ||
+                                value == Inst.RepeScasB  ||
+                                value == Inst.RepeScasD  ||
+                                value == Inst.RepeScasQ  ||
+                                value == Inst.RepeScasW  ||
                                 value == Inst.RepneCmpsB ||
                                 value == Inst.RepneCmpsD ||
                                 value == Inst.RepneCmpsQ ||
@@ -179,10 +179,10 @@ namespace AsmJit.CompilerContext
                                     break;
 
                                 case var value when
-                                value == Inst.Xrstor ||
+                                value == Inst.Xrstor   ||
                                 value == Inst.Xrstor64 ||
-                                value == Inst.Xsave ||
-                                value == Inst.Xsave64 ||
+                                value == Inst.Xsave    ||
+                                value == Inst.Xsave64  ||
                                 value == Inst.Xsaveopt ||
                                 value == Inst.Xsaveopt64:
                                     o0 = opList[0];

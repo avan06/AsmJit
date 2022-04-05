@@ -7,32 +7,15 @@ namespace AsmJit.Common.Operands
     {
         internal Memory() : base(OperandType.Memory)
         {
+            MemoryType = MemoryType.BaseIndex;
+            Displacement = 0;
             Index = RegisterIndex.Invalid;
             Base = RegisterIndex.Invalid;
-            Displacement = 0;
-            MemoryType = MemoryType.BaseIndex;
         }
 
         internal Memory(Memory other) : base(other) { }
 
         internal Memory(Memory other, int size) : base(other) => Size = size;
-
-        internal Memory(Label label, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            Id = label.Id;
-            MemoryType = MemoryType.Label;
-            Displacement = disp;
-            Index = RegisterIndex.Invalid;
-        }
-
-        internal Memory(Label label, GpRegister index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            Id = label.Id;
-            MemoryType = MemoryType.Label;
-            Displacement = disp;
-            Index = index.Index;
-            Flags = (Constants.X86.MemVSibGpz << Constants.X86.MemVSibIndex) + (shift << Constants.X86.MemShiftIndex);
-        }
 
         internal Memory(RipRegister rip, int disp, int size = 0) : base(OperandType.Memory, size)
         {
@@ -41,45 +24,51 @@ namespace AsmJit.Common.Operands
             Index = RegisterIndex.Invalid;
         }
 
+        internal Memory(MemoryType memType) : base(OperandType.Memory)
+        {
+            MemoryType = memType;
+            Displacement = 0;
+            Index = RegisterIndex.Invalid;
+        }
+
+        internal Memory(MemoryType memType, GpVariable @base, int disp, int size) : base(OperandType.Memory, size)
+        {
+            Id = @base.Id;
+            MemoryType = memType;
+            Displacement = disp;
+            Index = RegisterIndex.Invalid;
+        }
+
+        internal Memory(MemoryType memType, GpVariable index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
+        {
+            MemoryType = memType;
+            Displacement = disp;
+            Index = index.RegisterIndex;
+
+            var flags = shift << Constants.X86.MemShiftIndex;
+            if (index.IsGp()) flags |= GetGpdFlags(index);
+            else if (index.IsXmm()) flags |= Constants.X86.MemVSibXmm << Constants.X86.MemVSibIndex;
+            else if (index.IsYmm()) flags |= Constants.X86.MemVSibYmm << Constants.X86.MemVSibIndex;
+            Flags = flags;
+        }
+
+        internal Memory(MemoryType memType, GpVariable @base, GpVariable index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
+        {
+            Id = @base.Id;
+            MemoryType = memType;
+            Displacement = disp;
+            Index = index.Id;
+            Flags = shift << Constants.X86.MemShiftIndex;
+        }
+        
+        ////////////////////////////////////
         internal Memory(GpRegister @base, int disp, int size = 0) : base(OperandType.Memory, size)
         {
             Id = @base.Index;
             MemoryType = MemoryType.BaseIndex;
             Displacement = disp;
-            Flags = GetGpdFlags(@base) + (Constants.X86.MemVSibGpz << Constants.X86.MemVSibIndex);
             Index = RegisterIndex.Invalid;
-        }
-
-        internal Memory(GpVariable @base, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            Id = @base.Id;
-            MemoryType = MemoryType.BaseIndex;
-            Displacement = disp;
             Flags = GetGpdFlags(@base) + (Constants.X86.MemVSibGpz << Constants.X86.MemVSibIndex);
-            Index = RegisterIndex.Invalid;
-        }
-
-        internal Memory(Variable index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            var flags = shift << Constants.X86.MemShiftIndex;
-
-            var indexRegType = index.RegisterType;
-
-            if (indexRegType <= RegisterType.Gpq) flags |= GetGpdFlags(index);
-            else switch (indexRegType)
-            {
-                case RegisterType.Xmm:
-                    flags |= Constants.X86.MemVSibXmm << Constants.X86.MemVSibIndex;
-                    break;
-                case RegisterType.Ymm:
-                    flags |= Constants.X86.MemVSibYmm << Constants.X86.MemVSibIndex;
-                    break;
-            }
-
-            MemoryType = MemoryType.Absolute;
-            Displacement = disp;
-            Flags = flags;
-            Index = index.Id;
         }
 
         internal Memory(GpRegister @base, GpRegister index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
@@ -109,6 +98,23 @@ namespace AsmJit.Common.Operands
             Flags = GetGpdFlags(@base) + (Constants.X86.MemVSibYmm << Constants.X86.MemVSibIndex) + (shift << Constants.X86.MemShiftIndex);
         }
 
+        internal Memory(Label label, int disp, int size = 0) : base(OperandType.Memory, size)
+        {
+            Id = label.Id;
+            MemoryType = MemoryType.Label;
+            Displacement = disp;
+            Index = RegisterIndex.Invalid;
+        }
+
+        internal Memory(Label label, GpRegister index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
+        {
+            Id = label.Id;
+            MemoryType = MemoryType.Label;
+            Displacement = disp;
+            Index = index.Index;
+            Flags = (Constants.X86.MemVSibGpz << Constants.X86.MemVSibIndex) + (shift << Constants.X86.MemShiftIndex);
+        }
+
         internal Memory(Label label, GpVariable index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
         {
             Id = label.Id;
@@ -116,6 +122,24 @@ namespace AsmJit.Common.Operands
             Displacement = disp;
             Index = index.Id;
             Flags = GetGpdFlags(index) + (shift << Constants.X86.MemShiftIndex);
+        }
+
+        internal Memory(GpVariable @base, int disp, int size = 0) : base(OperandType.Memory, size)
+        {
+            Id = @base.Id;
+            MemoryType = MemoryType.BaseIndex;
+            Displacement = disp;
+            Index = RegisterIndex.Invalid;
+            Flags = GetGpdFlags(@base) + (Constants.X86.MemVSibGpz << Constants.X86.MemVSibIndex);
+        }
+
+        internal Memory(GpVariable @base, GpVariable index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
+        {
+            Id = @base.Id;
+            MemoryType = MemoryType.BaseIndex;
+            Displacement = disp;
+            Index = index.Id;
+            Flags = GetGpdFlags(@base) + (shift << Constants.X86.MemShiftIndex);
         }
 
         internal Memory(GpVariable @base, XmmVariable index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
@@ -136,32 +160,8 @@ namespace AsmJit.Common.Operands
             Flags = GetGpdFlags(@base) + (Constants.X86.MemVSibYmm << Constants.X86.MemVSibIndex) + (shift << Constants.X86.MemShiftIndex);
         }
 
-        internal Memory(GpVariable @base, GpVariable index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            Id = @base.Id;
-            MemoryType = MemoryType.BaseIndex;
-            Displacement = disp;
-            Index = index.Id;
-            Flags = GetGpdFlags(@base) + (shift << Constants.X86.MemShiftIndex);
-        }
-
-        internal Memory(MemoryType memType) : base(OperandType.Memory)
-        {
-            MemoryType = memType;
-            Displacement = 0;
-            Index = RegisterIndex.Invalid;
-        }
-
         internal Memory(MemoryType memType, int disp, int size) : base(OperandType.Memory, size)
         {
-            MemoryType = memType;
-            Displacement = disp;
-            Index = RegisterIndex.Invalid;
-        }
-
-        internal Memory(MemoryType memType, GpVariable @base, int disp, int size) : base(OperandType.Memory, size)
-        {
-            Id = @base.Id;
             MemoryType = memType;
             Displacement = disp;
             Index = RegisterIndex.Invalid;
@@ -172,37 +172,35 @@ namespace AsmJit.Common.Operands
             MemoryType = memType;
             Displacement = disp;
             Index = index.Index;
-            var flags = shift << Constants.X86.MemShiftIndex;
 
+            var flags = shift << Constants.X86.MemShiftIndex;
             if (index.IsGp()) flags |= GetGpdFlags(index);
             else if (index.IsXmm()) flags |= Constants.X86.MemVSibXmm << Constants.X86.MemVSibIndex;
             else if (index.IsYmm()) flags |= Constants.X86.MemVSibYmm << Constants.X86.MemVSibIndex;
-
             Flags = flags;
         }
 
-        internal Memory(MemoryType memType, GpVariable index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
+        internal Memory(Variable index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
         {
-            MemoryType = memType;
-            Displacement = disp;
-            Index = index.RegisterIndex;
-            var flags = shift << Constants.X86.MemShiftIndex;
-
-            if (index.IsGp()) flags |= GetGpdFlags(index);
-            else if (index.IsXmm()) flags |= Constants.X86.MemVSibXmm << Constants.X86.MemVSibIndex;
-            else if (index.IsYmm()) flags |= Constants.X86.MemVSibYmm << Constants.X86.MemVSibIndex;
-
-            Flags = flags;
-        }
-
-        internal Memory(MemoryType memType, GpVariable @base, GpVariable index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            Id = @base.Id;
-            MemoryType = memType;
+            MemoryType = MemoryType.Absolute;
             Displacement = disp;
             Index = index.Id;
-            Flags = shift << Constants.X86.MemShiftIndex;
+
+            var flags = shift << Constants.X86.MemShiftIndex;
+            var indexRegType = index.RegisterType;
+            if (indexRegType <= RegisterType.Gpq) flags |= GetGpdFlags(index);
+            else switch (indexRegType)
+                {
+                    case RegisterType.Xmm:
+                        flags |= Constants.X86.MemVSibXmm << Constants.X86.MemVSibIndex;
+                        break;
+                    case RegisterType.Ymm:
+                        flags |= Constants.X86.MemVSibYmm << Constants.X86.MemVSibIndex;
+                        break;
+                }
+            Flags = flags;
         }
+        ////////////////////////////////////
 
         private int GetGpdFlags(Operand @base) => (@base.Size & 4) << (Constants.X86.MemGpdIndex - 2);
 
@@ -271,368 +269,96 @@ namespace AsmJit.Common.Operands
         internal bool HasBaseOrIndex() => Base != RegisterIndex.Invalid || Index != RegisterIndex.Invalid;
 
         /// <summary>
-        /// Creates `[base.reg + offset]` memory operand.
+        /// Creates `[base + disp]` memory operand.
         /// </summary>
-        internal static Memory Ptr(GpRegister @base, int disp = 0, int size = 0) => new Memory(@base, disp, size);
-
-        /// <summary>
-        /// Creates `[base.reg + (index << shift) + offset]` memory operand (scalar index).
-        /// </summary>
-        internal static Memory Ptr(GpRegister @base, GpRegister index, int shift = 0, int disp = 0, int size = 0) => new Memory(@base, index, shift, disp, size);
-
-        /// <summary>
-        /// Creates `[base.reg + (index << shift) + offset]` memory operand (vector index).
-        /// </summary>
-        internal static Memory Ptr(GpRegister @base, XmmRegister index, int shift = 0, int disp = 0, int size = 0) => new Memory(@base, index, shift, disp, size);
-
-        /// <summary>
-        /// Creates `[base.reg + (index << shift) + offset]` memory operand (vector index).
-        /// </summary>
-        internal static Memory Ptr(GpRegister @base, YmmRegister index, int shift = 0, int disp = 0, int size = 0) => new Memory(@base, index, shift, disp, size);
-
-        /// <summary>
-        /// Creates `[base + offset]` memory operand.
-        /// </summary>
-        public static Memory Ptr(Label label, int disp = 0, int size = 0) => new Memory(label, disp, size);
-
-        /// <summary>
-        /// Creates `[base + (index << shift) + offset]` memory operand.
-        /// </summary>
-        public static Memory Ptr(Label label, GpRegister index, int shift, int disp = 0, int size = 0) => new Memory(label, index, shift, disp, size);
-
-        /// <summary>
-        /// Creates `[rip + offset]` memory operand.
-        /// </summary>
-        internal static Memory Ptr(RipRegister rip, int disp = 0, int size = 0) => new Memory(rip, disp, size);
-
-        /// <summary>
-        /// Creates `[base]` absolute memory operand.
-        /// </summary>
-        internal static Memory Ptr(long @base, int size = 0)
+        public static Memory Ptr(Operand @base, int disp = 0, int size = 0)
         {
-            IntPtr pAbs = (IntPtr)(@base >> 32);
-            int disp = (int)(@base & 0xFFFFFFFFu);
-            return PtrAbs(pAbs, disp, size);
+            dynamic caseBase;
+            if (@base is Label label) caseBase = label;
+            else if (@base is GpRegister regBase) caseBase = regBase;
+            else if (@base is RipRegister ripRegister) caseBase = ripRegister;
+            else if (@base is GpVariable gpVariable) caseBase = gpVariable;
+            else throw new ArgumentException();
+
+            return new Memory(caseBase, disp, size);
         }
-
-        public static Memory Ptr(GpVariable @base, int disp = 0, int size = 0) => new Memory(@base, disp, size);
-
-        public static Memory Ptr(GpVariable @base, GpVariable index, int shift = 0, int disp = 0, int size = 0) => new Memory(@base, index, shift, disp, size);
-
-        public static Memory Ptr(GpVariable @base, XmmVariable index, int shift = 0, int disp = 0, int size = 0) => new Memory(@base, index, shift, disp, size);
-
-        public static Memory Ptr(GpVariable @base, YmmVariable index, int shift = 0, int disp = 0, int size = 0) => new Memory(@base, index, shift, disp, size);
-
-        public static Memory Ptr(Label label, GpVariable index, int shift, int disp = 0, int size = 0) => new Memory(label, index, shift, disp, size);
-
-        public static Memory PtrAbs(IntPtr pAbs, int disp, int i) => new Memory(MemoryType.Absolute, (int)(pAbs + disp), i);
-
-        internal static Memory PtrAbs(IntPtr pAbs, Register index, int shift, int disp, int i) => new Memory(MemoryType.Absolute, index, shift, (int)(pAbs + disp), i);
-
-        public static Memory PtrAbs(IntPtr pAbs, Variable index, int shift, int disp, int size) => new Memory(index, (int)(pAbs + disp), shift, size);
-
-        public static Memory Byte(GpRegister @base, int disp = 0) => new Memory(@base, disp, 1);
-
-        public static Memory Byte(GpRegister @base, GpRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 1);
-
-        public static Memory Byte(GpRegister @base, XmmRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 1);
-
-        public static Memory Byte(GpRegister @base, YmmRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 1);
-
-        public static Memory Byte(Label label, int disp = 0) => Ptr(label, disp, 1);
-
-        public static Memory Byte(Label label, GpRegister index, int shift, int disp = 0) => Ptr(label, index, shift, disp, 1);
-
-        public static Memory Byte(RipRegister rip, int disp = 0) => Ptr(rip, disp, 1);
-
-        public static Memory ByteAbs(IntPtr pAbs, int disp = 0) => PtrAbs(pAbs, disp, 1);
-
-        public static Memory ByteAbs(IntPtr pAbs, GpRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 1);
-
-        public static Memory ByteAbs(IntPtr pAbs, XmmRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 1);
-
-        public static Memory ByteAbs(IntPtr pAbs, YmmRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 1);
-
-        public static Memory Word(GpRegister @base, int disp = 0) => new Memory(@base, disp, 2);
-
-        public static Memory Word(GpRegister @base, GpRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 2);
-
-        public static Memory Word(GpRegister @base, XmmRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 2);
-
-        public static Memory Word(GpRegister @base, YmmRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 2);
-
-        public static Memory Word(Label label, int disp = 0) => Ptr(label, disp, 2);
-
-        public static Memory Word(Label label, GpRegister index, int shift, int disp = 0) => Ptr(label, index, shift, disp, 2);
-
-        public static Memory Word(RipRegister rip, int disp = 0) => Ptr(rip, disp, 2);
-
-        public static Memory WordAbs(IntPtr pAbs, int disp = 0) => PtrAbs(pAbs, disp, 2);
-
-        public static Memory WordAbs(IntPtr pAbs, GpRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 2);
-
-        public static Memory WordAbs(IntPtr pAbs, XmmRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 2);
-
-        public static Memory WordAbs(IntPtr pAbs, YmmRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 2);
-
-        public static Memory DWord(GpRegister @base, int disp = 0) => new Memory(@base, disp, 4);
-
-        public static Memory DWord(GpRegister @base, GpRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 4);
-
-        public static Memory DWord(GpRegister @base, XmmRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 4);
-
-        public static Memory DWord(GpRegister @base, YmmRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 4);
-
-        public static Memory DWord(Label label, int disp = 0) => Ptr(label, disp, 4);
-
-        public static Memory DWord(Label label, GpRegister index, int shift, int disp = 0) => Ptr(label, index, shift, disp, 4);
-
-        public static Memory DWord(RipRegister rip, int disp = 0) => Ptr(rip, disp, 4);
-
-        public static Memory DWordAbs(IntPtr pAbs, int disp = 0) => PtrAbs(pAbs, disp, 4);
-
-        public static Memory DWordAbs(IntPtr pAbs, GpRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 4);
-
-        public static Memory DWordAbs(IntPtr pAbs, XmmRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 4);
-
-        public static Memory DWordAbs(IntPtr pAbs, YmmRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 4);
-
-        public static Memory QWord(GpRegister @base, int disp = 0) => new Memory(@base, disp, 8);
-
-        public static Memory QWord(GpRegister @base, GpRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 8);
-
-        public static Memory QWord(GpRegister @base, XmmRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 8);
-
-        public static Memory QWord(GpRegister @base, YmmRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 8);
-
-        public static Memory QWord(Label label, int disp = 0) => Ptr(label, disp, 8);
-
-        public static Memory QWord(Label label, GpRegister index, int shift, int disp = 0) => Ptr(label, index, shift, disp, 8);
-
-        public static Memory QWord(RipRegister rip, int disp = 0) => Ptr(rip, disp, 8);
-
-        public static Memory QWordAbs(IntPtr pAbs, int disp = 0) => PtrAbs(pAbs, disp, 8);
-
-        public static Memory QWordAbs(IntPtr pAbs, GpRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 8);
-
-        public static Memory QWordAbs(IntPtr pAbs, XmmRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 8);
-
-        public static Memory QWordAbs(IntPtr pAbs, YmmRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 8);
-
-        public static Memory TWord(GpRegister @base, int disp = 0) => new Memory(@base, disp, 10);
-
-        public static Memory TWord(GpRegister @base, GpRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 10);
-
-        public static Memory TWord(GpRegister @base, XmmRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 10);
-
-        public static Memory TWord(GpRegister @base, YmmRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 10);
-
-        public static Memory TWord(Label label, int disp = 0) => Ptr(label, disp, 10);
-
-        public static Memory TWord(Label label, GpRegister index, int shift, int disp = 0) => Ptr(label, index, shift, disp, 10);
-
-        public static Memory TWord(RipRegister rip, int disp = 0) => Ptr(rip, disp, 10);
-
-        public static Memory TWordPtrAbs(IntPtr pAbs, int disp = 0) => PtrAbs(pAbs, disp, 10);
-
-        public static Memory TWordPtrAbs(IntPtr pAbs, GpRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 10);
-
-        public static Memory TWordPtrAbs(IntPtr pAbs, XmmRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 10);
-
-        public static Memory TWordPtrAbs(IntPtr pAbs, YmmRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 10);
-
-        public static Memory OWordPtr(GpRegister @base, int disp = 0) => new Memory(@base, disp, 16);
-
-        public static Memory OWordPtr(GpRegister @base, GpRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 16);
-
-        public static Memory OWordPtr(GpRegister @base, XmmRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 16);
-
-        public static Memory OWordPtr(GpRegister @base, YmmRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 16);
-
-        public static Memory OWordPtr(Label label, int disp = 0) => Ptr(label, disp, 16);
-
-        public static Memory OWordPtr(Label label, GpRegister index, int shift, int disp = 0) => Ptr(label, index, shift, disp, 16);
-
-        public static Memory OWordPtr(RipRegister rip, int disp = 0) => Ptr(rip, disp, 16);
-
-        public static Memory OWordPtrAbs(IntPtr pAbs, int disp = 0) => PtrAbs(pAbs, disp, 16);
-
-        public static Memory OWordPtrAbs(IntPtr pAbs, GpRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 16);
-
-        public static Memory OWordPtrAbs(IntPtr pAbs, XmmRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 16);
-
-        public static Memory OWordPtrAbs(IntPtr pAbs, YmmRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 16);
-
-        public static Memory YWordPtr(GpRegister @base, int disp = 0) => new Memory(@base, disp, 32);
-
-        public static Memory YWordPtr(GpRegister @base, GpRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 32);
-
-        public static Memory YWordPtr(GpRegister @base, XmmRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 32);
-
-        public static Memory YWordPtr(GpRegister @base, YmmRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 32);
-
-        public static Memory YWordPtr(Label label, int disp = 0) => Ptr(label, disp, 32);
-
-        public static Memory YWordPtr(Label label, GpRegister index, int shift, int disp = 0) => Ptr(label, index, shift, disp, 32);
-
-        public static Memory YWordPtr(RipRegister rip, int disp = 0) => Ptr(rip, disp, 32);
-
-        public static Memory YWordPtrAbs(IntPtr pAbs, int disp = 0) => PtrAbs(pAbs, disp, 32);
-
-        public static Memory YWordPtrAbs(IntPtr pAbs, GpRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 32);
-
-        public static Memory YWordPtrAbs(IntPtr pAbs, XmmRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 32);
-
-        public static Memory YWordPtrAbs(IntPtr pAbs, YmmRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 32);
-
-        public static Memory ZWordPtr(GpRegister @base, int disp = 0) => new Memory(@base, disp, 64);
-
-        public static Memory ZWordPtr(GpRegister @base, GpRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 64);
-
-        public static Memory ZWordPtr(GpRegister @base, XmmRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 64);
-
-        public static Memory ZWordPtr(GpRegister @base, YmmRegister index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 64);
-
-        public static Memory ZWordPtr(Label label, int disp = 0) => Ptr(label, disp, 64);
-
-        public static Memory ZWordPtr(Label label, GpRegister index, int shift, int disp = 0) => Ptr(label, index, shift, disp, 64);
-
-        public static Memory ZWordPtr(RipRegister rip, int disp = 0) => Ptr(rip, disp, 64);
-
-        public static Memory ZWordPtrAbs(IntPtr pAbs, int disp = 0) => PtrAbs(pAbs, disp, 64);
-
-        public static Memory ZWordPtrAbs(IntPtr pAbs, GpRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 64);
-
-        public static Memory ZWordPtrAbs(IntPtr pAbs, XmmRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 64);
-
-        public static Memory ZWordPtrAbs(IntPtr pAbs, YmmRegister index, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 64);
-
-        public static Memory Byte(GpVariable @base, int disp = 0) => new Memory(@base, disp, 1);
-
-        public static Memory Byte(GpVariable @base, GpVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 1);
-
-        public static Memory Byte(GpVariable @base, XmmVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 1);
-
-        public static Memory Byte(GpVariable @base, YmmVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 1);
-
-        public static Memory Byte(Label label, GpVariable index, int shift, int disp = 0) => Ptr(label, index, shift, disp, 1);
-
-        public static Memory ByteAbs(IntPtr pAbs, GpVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 1);
-
-        public static Memory ByteAbs(IntPtr pAbs, XmmVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 1);
-
-        public static Memory ByteAbs(IntPtr pAbs, YmmVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 1);
-
-        public static Memory Word(GpVariable @base, int disp = 0) => new Memory(@base, disp, 2);
-
-        public static Memory Word(GpVariable @base, GpVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 2);
-
-        public static Memory Word(GpVariable @base, XmmVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 2);
-
-        public static Memory Word(GpVariable @base, YmmVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 2);
-
-        public static Memory Word(Label label, GpVariable index, int shift, int disp = 0) => Ptr(label, index, shift, disp, 2);
-
-        public static Memory WordAbs(IntPtr pAbs, GpVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 2);
-
-        public static Memory WordAbs(IntPtr pAbs, XmmVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 2);
-
-        public static Memory WordAbs(IntPtr pAbs, YmmVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 2);
-
-        public static Memory DWord(GpVariable @base, int disp = 0) => new Memory(@base, disp, 4);
-
-        public static Memory DWord(GpVariable @base, GpVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 4);
-
-        public static Memory DWord(GpVariable @base, XmmVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 4);
-
-        public static Memory DWord(GpVariable @base, YmmVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 4);
-
-        public static Memory DWord(Label label, GpVariable index, int shift, int disp = 0) => Ptr(label, index, shift, disp, 4);
-
-        public static Memory DWordAbs(IntPtr pAbs, GpVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 4);
-
-        public static Memory DWordAbs(IntPtr pAbs, XmmVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 4);
-
-        public static Memory DWordAbs(IntPtr pAbs, YmmVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 4);
-
-        public static Memory QWord(GpVariable @base, int disp = 0) => new Memory(@base, disp, 8);
-
-        public static Memory QWord(GpVariable @base, GpVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 8);
-
-        public static Memory QWord(GpVariable @base, XmmVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 8);
-
-        public static Memory QWord(GpVariable @base, YmmVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 8);
-
-        public static Memory QWord(Label label, GpVariable index, int shift, int disp = 0) => Ptr(label, index, shift, disp, 8);
-
-        public static Memory QWordAbs(IntPtr pAbs, GpVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 8);
-
-        public static Memory QWordAbs(IntPtr pAbs, XmmVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 8);
-
-        public static Memory QWordAbs(IntPtr pAbs, YmmVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 8);
-
-        public static Memory TWord(GpVariable @base, int disp = 0) => new Memory(@base, disp, 10);
-
-        public static Memory TWord(GpVariable @base, GpVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 10);
-
-        public static Memory TWord(GpVariable @base, XmmVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 10);
-
-        public static Memory TWord(GpVariable @base, YmmVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 10);
-
-        public static Memory TWord(Label label, GpVariable index, int shift, int disp = 0) => Ptr(label, index, shift, disp, 10);
-
-        public static Memory TWordAbs(IntPtr pAbs, GpVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 10);
-
-        public static Memory TWordAbs(IntPtr pAbs, XmmVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 10);
-
-        public static Memory TWordAbs(IntPtr pAbs, YmmVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 10);
-
-        public static Memory OWord(GpVariable @base, int disp = 0) => new Memory(@base, disp, 16);
-
-        public static Memory OWord(GpVariable @base, GpVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 16);
-
-        public static Memory OWord(GpVariable @base, XmmVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 16);
-
-        public static Memory OWord(GpVariable @base, YmmVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 16);
-
-        public static Memory OWord(Label label, GpVariable index, int shift, int disp = 0) => Ptr(label, index, shift, disp, 16);
-
-        public static Memory OWord(IntPtr pAbs, GpVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 16);
-
-        public static Memory OWord(IntPtr pAbs, XmmVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 16);
-
-        public static Memory OWord(IntPtr pAbs, YmmVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 16);
-
-        public static Memory YWord(GpVariable @base, int disp = 0) => new Memory(@base, disp, 32);
-
-        public static Memory YWord(GpVariable @base, GpVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 32);
-
-        public static Memory YWord(GpVariable @base, XmmVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 32);
-
-        public static Memory YWord(GpVariable @base, YmmVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 32);
-
-        public static Memory YWord(Label label, GpVariable index, int shift, int disp = 0) => Ptr(label, index, shift, disp, 32);
-
-        public static Memory YWordAbs(IntPtr pAbs, GpVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 32);
-
-        public static Memory YWordAbs(IntPtr pAbs, XmmVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 32);
-
-        public static Memory YWordAbs(IntPtr pAbs, YmmVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 32);
-
-        public static Memory ZWord(GpVariable @base, int disp = 0) => new Memory(@base, disp, 64);
-
-        public static Memory ZWord(GpVariable @base, GpVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 64);
-
-        public static Memory ZWord(GpVariable @base, XmmVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 64);
-
-        public static Memory ZWord(GpVariable @base, YmmVariable index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 64);
-
-        public static Memory ZWord(Label label, GpVariable index, int shift, int disp = 0) => Ptr(label, index, shift, disp, 64);
-
-        public static Memory ZWordAbs(IntPtr pAbs, GpVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 64);
-
-        public static Memory ZWordAbs(IntPtr pAbs, XmmVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 64);
-
-        public static Memory ZWordAbs(IntPtr pAbs, YmmVariable index, int shift = 0, int disp = 0) => PtrAbs(pAbs, (index), shift, disp, 64);
+        public static Memory Byte(Operand @base, int disp = 0) => Ptr(@base, disp, 1);
+        public static Memory Word(Operand @base, int disp = 0) => Ptr(@base, disp, 2);
+        public static Memory DWord(Operand @base, int disp = 0) => Ptr(@base, disp, 4);
+        public static Memory QWord(Operand @base, int disp = 0) => Ptr(@base, disp, 8);
+        public static Memory TWord(Operand @base, int disp = 0) => Ptr(@base, disp, 10);
+        public static Memory OWordPtr(Operand @base, int disp = 0) => Ptr(@base, disp, 16);
+        public static Memory YWordPtr(Operand @base, int disp = 0) => Ptr(@base, disp, 32);
+        public static Memory ZWordPtr(Operand @base, int disp = 0) => Ptr(@base, disp, 64);
+
+        /// <summary>
+        /// Creates `[base + (index << shift) + disp]` memory operand (scalar&vector index).
+        /// </summary>
+        public static Memory Ptr(Operand rawBase, Operand rawIndex, int shift = 0, int disp = 0, int size = 0)
+        {
+            dynamic @base;
+            dynamic index;
+            bool isLabel = false;
+            if (rawBase is Label label)
+            {
+                @base = label;
+                isLabel = true;
+            }
+            else if (rawBase is GpRegister regBase) @base = regBase;
+            else if (rawBase is GpVariable varBase) @base = varBase;
+            else throw new ArgumentException();
+
+            if (isLabel && !(rawIndex is GpRegister) && !(rawIndex is GpVariable)) throw new ArgumentException();
+
+            else if (rawIndex is GpRegister gpRegister) index = gpRegister;
+            else if (rawIndex is XmmRegister xmmRegister) index = xmmRegister;
+            else if (rawIndex is YmmRegister ymmRegister) index = ymmRegister;
+            else if (rawIndex is GpVariable gpVariable) index = gpVariable;
+            else if (rawIndex is XmmVariable xmmVariable) index = xmmVariable;
+            else if (rawIndex is YmmVariable ymmVariable) index = ymmVariable;
+            else throw new ArgumentException();
+
+            return new Memory(@base, index, shift, disp, size);
+        }
+        public static Memory Byte(Operand @base, Operand index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 1);
+        public static Memory Word(Operand @base, Operand index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 2);
+        public static Memory DWord(Operand @base, Operand index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 4);
+        public static Memory QWord(Operand @base, Operand index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 8);
+        public static Memory TWord(Operand @base, Operand index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 10);
+        public static Memory OWordPtr(Operand @base, Operand index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 16);
+        public static Memory YWordPtr(Operand @base, Operand index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 32);
+        public static Memory ZWordPtr(Operand @base, Operand index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 64);
+
+        /// <summary>
+        /// Creates `[base + (index << shift) + disp]` absolute memory operand.
+        /// </summary>
+        public static Memory PtrAbs(IntPtr pAbs, Operand rawIndex = null, int shift = 0, int disp = 0, int size = 0)
+        {
+            dynamic index = rawIndex;
+            switch (rawIndex)
+            {
+                case null:
+                    return new Memory(MemoryType.Absolute, (int)(pAbs + disp), size);
+                case GpRegister _:
+                case XmmRegister _:
+                case YmmRegister _:
+                    return new Memory(MemoryType.Absolute, index, shift, (int)(pAbs + disp), size);
+                case GpVariable _:
+                case XmmVariable _:
+                case YmmVariable _:
+                    return new Memory(index, (int)(pAbs + disp), shift, size);
+                default:
+                    throw new ArgumentException();
+            }
+        }
+        internal static Memory PtrAbs(long @base, int size = 0) => PtrAbs((IntPtr)(@base >> 32), null, 0, (int)(@base & 0xFFFFFFFFu), size);
+        public static Memory ByteAbs(IntPtr pAbs, Operand index = null, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 1);
+        public static Memory WordAbs(IntPtr pAbs, Operand index = null, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 2);
+        public static Memory DWordAbs(IntPtr pAbs, Operand index = null, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 4);
+        public static Memory QWordAbs(IntPtr pAbs, Operand index = null, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 8);
+        public static Memory TWordPtrAbs(IntPtr pAbs, Operand index = null, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 10);
+        public static Memory OWordPtrAbs(IntPtr pAbs, Operand index = null, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 16);
+        public static Memory YWordPtrAbs(IntPtr pAbs, Operand index = null, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 32);
+        public static Memory ZWordPtrAbs(IntPtr pAbs, Operand index = null, int shift = 0, int disp = 0) => PtrAbs(pAbs, index, shift, disp, 64);
     }
 }

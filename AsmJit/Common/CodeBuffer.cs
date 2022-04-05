@@ -88,7 +88,7 @@ namespace AsmJit.Common
             }
         }
 
-        private static OpCodeMm[] _opCodeMm =
+        private static readonly OpCodeMm[] _opCodeMm =
         {
             new OpCodeMm(),
             new OpCodeMm(1, 0x0F, 0x00, 0),
@@ -108,9 +108,9 @@ namespace AsmJit.Common
             new OpCodeMm(0, 0x0F, 0x01, 0)
         };
 
-        private static byte[] _opCodePp = { 0x00, 0x66, 0xF3, 0xF2, 0x00, 0x00, 0x00, 0x9B };
+        private static readonly byte[] _opCodePp = { 0x00, 0x66, 0xF3, 0xF2, 0x00, 0x00, 0x00, 0x9B };
 
-        private static Register[] _patchedHiRegs =
+        private static readonly Register[] _patchedHiRegs =
         {
             Cpu.GpbHi(4),
             Cpu.GpbHi(5),
@@ -118,17 +118,17 @@ namespace AsmJit.Common
             Cpu.GpbHi(7)
         };
 
-        private static byte[] _segmentPrefix = { 0x00, 0x26, 0x2E, 0x36, 0x3E, 0x64, 0x65 };
-        private static byte[] _opCodePushSeg = { 0x00, 0x06, 0x0E, 0x16, 0x1E, 0xA0, 0xA8 };
-        private static byte[] _opCodePopSeg = { 0x00, 0x07, 0x00, 0x17, 0x1F, 0xA1, 0xA9 };
+        private static readonly byte[] _segmentPrefix = { 0x00, 0x26, 0x2E, 0x36, 0x3E, 0x64, 0x65 };
+        private static readonly byte[] _opCodePushSeg = { 0x00, 0x06, 0x0E, 0x16, 0x1E, 0xA0, 0xA8 };
+        private static readonly byte[] _opCodePopSeg = { 0x00, 0x07, 0x00, 0x17, 0x1F, 0xA1, 0xA9 };
 
-        private EmitContextData _eh = new EmitContextData();
-        private AssemblerBase _assemblerBase;
+        private readonly EmitContextData _eh = new EmitContextData();
+        private readonly AssemblerBase _assemblerBase;
         private Pointer _buffer;
         private Pointer _end;
         private Pointer _cursor;
         private int _trampolinesSize;
-        private List<RelocationData> _relocations = new List<RelocationData>();
+        private readonly List<RelocationData> _relocations = new List<RelocationData>();
         private LabelLink _unusedLinks;
 
         public CodeBuffer(AssemblerBase assemblerBase) => _assemblerBase = assemblerBase;
@@ -370,7 +370,7 @@ namespace AsmJit.Common
             var cursor = _cursor;
             UnsafeMemory.Copy(cursor, data, size);
             if (_cursor + size < _buffer || _cursor + size > _end) throw new ArgumentOutOfRangeException();
-            _cursor = _cursor + size;
+            _cursor += size;
         }
 
         private byte GetByteAt(int pos)
@@ -788,7 +788,7 @@ namespace AsmJit.Common
                                 const int kRel32Size = 5;
                                 var offs = _eh.Label.Offset - Offset;
 
-                                if (!(offs <= 0)) throw new ArgumentException();
+                                if (offs > 0) throw new ArgumentException();
                                 EmitOp(_eh.OpCode);
                                 EmitDWord(offs - kRel32Size);
                             }
@@ -845,7 +845,7 @@ namespace AsmJit.Common
 
                         if (OperandsAre(OperandType.Register, OperandType.Register))
                         {
-                            if (!(op0.Size != 1)) throw new ArgumentException();
+                            if (op0.Size == 1) throw new ArgumentException();
 
                             _eh.Operand = (uint)OpReg(op0);
                             _eh.ModRmRegister = OpReg(op1);
@@ -855,7 +855,7 @@ namespace AsmJit.Common
 
                         if (OperandsAre(OperandType.Register, OperandType.Memory))
                         {
-                            if (!(op0.Size != 1)) throw new ArgumentException();
+                            if (op0.Size == 1) throw new ArgumentException();
 
                             _eh.Operand = (uint)OpReg(op0);
                             _eh.ModRmMemory = OpMem(op1);
@@ -869,7 +869,7 @@ namespace AsmJit.Common
 
                         if (OperandsAre(OperandType.Register, OperandType.Immediate))
                         {
-                            if (!(op0.Size != 1)) throw new ArgumentException();
+                            if (op0.Size == 1) throw new ArgumentException();
 
                             _eh.ImmediateValue = op1.As<Immediate>().Int64;
                             _eh.ImmediateLength = 1;
@@ -888,7 +888,7 @@ namespace AsmJit.Common
 
                         if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Immediate))
                         {
-                            if (!(op0.Size != 1)) throw new ArgumentException();
+                            if (op0.Size == 1) throw new ArgumentException();
 
                             _eh.ImmediateValue = op2.As<Immediate>().Int64;
                             _eh.ImmediateLength = 1;
@@ -907,7 +907,7 @@ namespace AsmJit.Common
 
                         if (OperandsAre(OperandType.Register, OperandType.Memory, OperandType.Immediate))
                         {
-                            if (!(op0.Size != 1)) throw new ArgumentException();
+                            if (op0.Size == 1) throw new ArgumentException();
 
                             _eh.ImmediateValue = op2.As<Immediate>().Int64;
                             _eh.ImmediateLength = 1;
@@ -988,7 +988,7 @@ namespace AsmJit.Common
                                 const int kRel32Size = 6;
 
                                 var offs = _eh.Label.Offset - Offset;
-                                if (!(offs <= 0)) throw new ArgumentException();
+                                if (offs > 0) throw new ArgumentException();
 
                                 if (!_eh.InstructionOptions.IsSet(InstructionOptions.LongForm) && (offs - kRel8Size).IsInt8())
                                 {
@@ -1158,7 +1158,7 @@ namespace AsmJit.Common
                             // Sreg <- Reg
                             if (OpRegType(op0) == RegisterType.Seg)
                             {
-                                if (!(op1.As<Register>().IsGpw() || op1.As<Register>().IsGpd() || op1.As<Register>().IsGpq())) throw new ArgumentException();
+                                if (!op1.As<Register>().IsGpw() && !op1.As<Register>().IsGpd() && !op1.As<Register>().IsGpq()) throw new ArgumentException();
 
                                 // `opReg` is the segment register.
                                 _eh.Operand--;
@@ -1172,7 +1172,7 @@ namespace AsmJit.Common
                             // Reg <- Sreg
                             if (OpRegType(op1) == RegisterType.Seg)
                             {
-                                if (!(op0.As<Register>().IsGpw() || op0.As<Register>().IsGpd() || op0.As<Register>().IsGpq())) throw new ArgumentException();
+                                if (!op0.As<Register>().IsGpw() && !op0.As<Register>().IsGpd() && !op0.As<Register>().IsGpq()) throw new ArgumentException();
 
                                 // `opReg` is the segment register.
                                 _eh.Operand = (uint)_eh.ModRmRegister - 1;
@@ -1185,7 +1185,7 @@ namespace AsmJit.Common
                                 break;
                             }
                             // Reg <- Reg
-                            if (!(op0.As<Register>().IsGpb() || op0.As<Register>().IsGpw() || op0.As<Register>().IsGpd() || op0.As<Register>().IsGpq())) throw new ArgumentException();
+                            if (!op0.As<Register>().IsGpb() && !op0.As<Register>().IsGpw() && !op0.As<Register>().IsGpd() && !op0.As<Register>().IsGpq()) throw new ArgumentException();
 
                             _eh.OpCode = 0x8A + (op0.Size != 1).AsUInt();
                             Add66HpBySize(op0.Size);
@@ -1210,7 +1210,7 @@ namespace AsmJit.Common
                                 break;
                             }
                             // Reg <- Mem
-                            if (!(op0.As<Register>().IsGpb() || op0.As<Register>().IsGpw() || op0.As<Register>().IsGpd() || op0.As<Register>().IsGpq())) throw new ArgumentException();
+                            if (!op0.As<Register>().IsGpb() && !op0.As<Register>().IsGpw() && !op0.As<Register>().IsGpd() && !op0.As<Register>().IsGpq()) throw new ArgumentException();
                             _eh.OpCode = 0x8A + (op0.Size != 1).AsUInt();
                             Add66HpBySize(op0.Size);
                             AddRexWBySize(op0.Size);
@@ -1233,8 +1233,7 @@ namespace AsmJit.Common
                                 break;
                             }
                             // X86Mem <- Reg
-                            if (!(op1.As<Register>().IsGpb() || op1.As<Register>().IsGpw() || op1.As<Register>().IsGpd() || op1.As<Register>().IsGpq())) throw new ArgumentException();
-
+                            if (!op1.As<Register>().IsGpb() && !op1.As<Register>().IsGpw() && !op1.As<Register>().IsGpd() && !op1.As<Register>().IsGpq()) throw new ArgumentException();
                             _eh.OpCode = 0x88 + (op1.Size != 1).AsUInt();
                             Add66HpBySize(op1.Size);
                             AddRexWBySize(op1.Size);
@@ -1458,7 +1457,7 @@ namespace AsmJit.Common
 
                         if (OperandsAre(OperandType.Register, OperandType.Register))
                         {
-                            if (!(OpRegType(op1) == RegisterType.GpbLo && OpReg(op1) == 1)) throw new ArgumentException();
+                            if (OpRegType(op1) != RegisterType.GpbLo || OpReg(op1) != 1) throw new ArgumentException();
                             _eh.OpCode += 2;
                             _eh.ModRmRegister = OpReg(op0);
                             EmitX86(true);
@@ -1467,7 +1466,7 @@ namespace AsmJit.Common
 
                         if (OperandsAre(OperandType.Memory, OperandType.Register))
                         {
-                            if (!(OpRegType(op1) == RegisterType.GpbLo && OpReg(op1) == 1)) throw new ArgumentException();
+                            if (OpRegType(op1) != RegisterType.GpbLo || OpReg(op1) != 1) throw new ArgumentException();
                             _eh.OpCode += 2;
                             _eh.ModRmMemory = OpMem(op0);
                             EmitX86(false, true);
@@ -1498,7 +1497,7 @@ namespace AsmJit.Common
                     case InstructionEncoding.X86Set:
                         if (OperandsAre(OperandType.Register))
                         {
-                            if (!(op0.Size == 1)) throw new ArgumentException();
+                            if (op0.Size != 1) throw new ArgumentException();
 
                             _eh.ModRmRegister = OpReg(op0);
                             EmitX86(true);
@@ -1507,7 +1506,7 @@ namespace AsmJit.Common
 
                         if (OperandsAre(OperandType.Memory))
                         {
-                            if (!(op0.Size == 1)) throw new ArgumentException();
+                            if (op0.Size != 1) throw new ArgumentException();
 
                             _eh.ModRmMemory = OpMem(op0);
                             EmitX86(false, true);
@@ -1516,7 +1515,7 @@ namespace AsmJit.Common
                     case InstructionEncoding.X86Shlrd:
                         if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Immediate))
                         {
-                            if (!(op0.Size == op1.Size)) throw new ArgumentException();
+                            if (op0.Size != op1.Size) throw new ArgumentException();
 
                             Add66HpBySize(op0.Size);
                             AddRexWBySize(op0.Size);
@@ -1549,8 +1548,8 @@ namespace AsmJit.Common
 
                         if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register))
                         {
-                            if (!(OpRegType(op2) == RegisterType.GpbLo && OpReg(op2) == 1)) throw new ArgumentException();
-                            if (!(op0.Size == op1.Size)) throw new ArgumentException();
+                            if (OpRegType(op2) != RegisterType.GpbLo || OpReg(op2) != 1) throw new ArgumentException();
+                            if (op0.Size != op1.Size) throw new ArgumentException();
 
                             Add66HpBySize(op0.Size);
                             AddRexWBySize(op0.Size);
@@ -1563,7 +1562,7 @@ namespace AsmJit.Common
 
                         if (OperandsAre(OperandType.Memory, OperandType.Register, OperandType.Register))
                         {
-                            if (!(OpRegType(op2) == RegisterType.GpbLo && OpReg(op2) == 1)) throw new ArgumentException();
+                            if (OpRegType(op2) != RegisterType.GpbLo || OpReg(op2) != 1) throw new ArgumentException();
 
                             Add66HpBySize(op1.Size);
                             AddRexWBySize(op1.Size);
@@ -1577,7 +1576,7 @@ namespace AsmJit.Common
                     case InstructionEncoding.X86Test:
                         if (OperandsAre(OperandType.Register, OperandType.Register))
                         {
-                            if (!(op0.Size == op1.Size)) throw new ArgumentException();
+                            if (op0.Size != op1.Size) throw new ArgumentException();
 
                             _eh.OpCode += (op0.Size != 1).AsUInt();
                             Add66HpBySize(op0.Size);
@@ -1656,7 +1655,7 @@ namespace AsmJit.Common
                                 _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
                                 _eh.OpCode |= 0x90;
                                 // One of `xchg a, b` or `xchg b, a` is AX/EAX/RAX.
-                                _eh.Operand = _eh.Operand + _eh.ModRmRegister;
+                                _eh.Operand += _eh.ModRmRegister;
                                 EmitX86OpWithOpReg();
                                 break;
                             }
@@ -2013,7 +2012,7 @@ namespace AsmJit.Common
 
                         if (OperandsAre(OperandType.Register, OperandType.Register))
                         {
-                            if (!(OpRegType(op0) > RegisterType.Gpd && OpRegType(op0) < RegisterType.Gpq)) throw new ArgumentException();
+                            if (OpRegType(op0) <= RegisterType.Gpd || OpRegType(op0) >= RegisterType.Gpq) throw new ArgumentException();
 
                             _eh.OpCode += (op0.Size != 1).AsUInt();
                             _eh.Operand = OpReg(op0);
@@ -2024,7 +2023,7 @@ namespace AsmJit.Common
 
                         if (OperandsAre(OperandType.Register, OperandType.Memory))
                         {
-                            if (!(OpRegType(op0) > RegisterType.Gpd && OpRegType(op0) < RegisterType.Gpq)) throw new ArgumentException();
+                            if (OpRegType(op0) <= RegisterType.Gpd || OpRegType(op0) >= RegisterType.Gpq) throw new ArgumentException();
 
                             _eh.OpCode += (op0.Size != 1).AsUInt();
                             _eh.Operand = OpReg(op0);
@@ -2100,8 +2099,8 @@ namespace AsmJit.Common
                         break;
                     case InstructionEncoding.ExtMov:
                     case InstructionEncoding.ExtMovNoRexW:
-                        if (!(extendedInfo.OperandFlags[0] != 0)) throw new ArgumentException();
-                        if (!(extendedInfo.OperandFlags[1] != 0)) throw new ArgumentException();
+                        if (extendedInfo.OperandFlags[0] == 0) throw new ArgumentException();
+                        if (extendedInfo.OperandFlags[1] == 0) throw new ArgumentException();
 
                         // Check parameters Gpd|Gpq|Mm|Xmm <- Gpd|Gpq|Mm|Xmm|X86Mem|Imm.
                         Debug.Assert(!(
@@ -3798,7 +3797,7 @@ namespace AsmJit.Common
         private void EmitDisplacement()
         {
             if (_eh.Label.Offset != -1) throw new ArgumentException();
-            if (!(_eh.DisplacementSize == 1 || _eh.DisplacementSize == 4)) throw new ArgumentException();
+            if (_eh.DisplacementSize != 1 && _eh.DisplacementSize != 4) throw new ArgumentException();
 
             // Chain with label.
             var link = CreateLabelLink();
@@ -3957,18 +3956,18 @@ namespace AsmJit.Common
 
         public static long EncodeMod(long m, long o, long rm)
         {
-            if (!(m <= 3)) throw new ArgumentException();
-            if (!(o <= 7)) throw new ArgumentException();
-            if (!(rm <= 7)) throw new ArgumentException();
+            if (m > 3) throw new ArgumentException();
+            if (o > 7) throw new ArgumentException();
+            if (rm > 7) throw new ArgumentException();
             return (m << 6) + (o << 3) + rm;
         }
 
         //! Encode SIB.
         public static long EncodeSib(long s, long i, long b)
         {
-            if (!(s <= 3)) throw new ArgumentException();
-            if (!(i <= 7)) throw new ArgumentException();
-            if (!(b <= 7)) throw new ArgumentException();
+            if (s > 3) throw new ArgumentException();
+            if (i > 7) throw new ArgumentException();
+            if (b > 7) throw new ArgumentException();
             return (s << 6) + (i << 3) + b;
         }
 
@@ -3979,7 +3978,7 @@ namespace AsmJit.Common
         public static long RexFromOpCodeAndOptions(long opCode, InstructionOptions options)
         {
             var rex = opCode >> (int)(Constants.X86.InstOpCode_W_Shift - 3);
-            if (!((rex & ~0x08) == 0)) throw new ArgumentException();
+            if ((rex & ~0x08) != 0) throw new ArgumentException();
 
             return rex + (long)(options & InstructionOptions.NoRexMask);
         }

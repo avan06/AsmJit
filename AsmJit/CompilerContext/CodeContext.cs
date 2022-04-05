@@ -9,7 +9,7 @@ namespace AsmJit.CompilerContext
 {
     public sealed class CodeContext<T> : CodeContext
     {
-        private Type _delegateType;
+        private readonly Type _delegateType;
 
         internal CodeContext(Compiler compiler, Type delegateType) : base(compiler) { _delegateType = delegateType; }
 
@@ -35,9 +35,9 @@ namespace AsmJit.CompilerContext
 
         internal CodeContext(Compiler compiler) => Compiler = compiler;
 
-        public Label Entry { get => Compiler.GetEntryLabel(); }
+        public Label Entry => Compiler.GetEntryLabel();
 
-        public Label Exit { get => Compiler.GetExitLabel(); }
+        public Label Exit => Compiler.GetExitLabel();
 
         public T SetArgument<T>(T v) where T : Variable => SetArgument(currArgLen++, v);
 
@@ -68,13 +68,23 @@ namespace AsmJit.CompilerContext
             return this;
         }
 
-        public void Bind(Label label) => Compiler.Bind(label);
+        public CodeContext Bind(Label label)
+        {
+            Compiler.Bind(label);
+            return this;
+        }
 
-        public void Spill(Variable variable) => Compiler.Spill(variable);
+        public void Spill(params Variable[] variables)
+        {
+            foreach (var variable in variables) Compiler.Spill(variable);
+        }
 
         public void Unuse(Variable variable) => Compiler.Unuse(variable);
 
-        public void Allocate(Variable variable) => Compiler.Allocate(variable);
+        public void Allocate(params Variable[] variables)
+        {
+            foreach (var variable in variables) Compiler.Allocate(variable);
+        }
 
         public void Allocate(Variable variable, Register r) => Compiler.Allocate(variable, r);
 
@@ -123,7 +133,7 @@ namespace AsmJit.CompilerContext
             }
         }
 
-        public void Emit(InstInfo instructionId, params dynamic[] insts)
+        public CodeContext Emit(InstInfo instructionId, params dynamic[] insts)
         {
             List<Operand> ops = new List<Operand>();
             for (int i = 0; i < insts.Length; i++)
@@ -138,6 +148,7 @@ namespace AsmJit.CompilerContext
                 ops.Add(insts[i]);
             }
             Compiler.Emit(instructionId, ops.ToArray());
+            return this;
         }
 
         public void Int3() => Compiler.Emit(Inst.Int, (Immediate)3);

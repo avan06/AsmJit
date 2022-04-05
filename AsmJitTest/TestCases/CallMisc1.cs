@@ -9,11 +9,12 @@ namespace AsmJitTest.TestCases
     {
         protected override void Compile(CodeContext c)
         {
-            var a1 = c.SetArgument(c.Int32("a1"));
-            var a2 = c.SetArgument(c.Int32("a2"));
-            var a3 = c.SetArgument(c.Int32("a3"));
+            var a1 = c.Int32("a1");
+            var a2 = c.Int32("a2");
+            var a3 = c.Int32("a3");
             var r = c.Int32("r");
 
+            c.SetArgument(a1, a2, a3);
             c.Allocate(a1, Cpu.Registers.Eax);
             c.Allocate(a2, Cpu.Registers.Ebx);
             c.Allocate(a3, Cpu.Registers.Ecx);
@@ -34,8 +35,6 @@ namespace AsmJitTest.TestCases
             expected = (44+199+10).ToString();
         }
 
-        private static void CalledFunction(int a, int b)
-        {
-        }
+        //private static void CalledFunction(int a, int b) {  }
     }
 }

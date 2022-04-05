@@ -41,7 +41,7 @@ namespace AsmJitTest
         }
 
         static bool CheckBit(uint[] registers, Register index, Bit bit) => (registers[(int)index] & (int)bit) == (int)bit;
-        
+
         private static readonly bool X64 = IntPtr.Size > 4;
 
         private static Cpuid _instance;
@@ -171,7 +171,7 @@ namespace AsmJitTest
         }
 
         public string Cpu { get; private set; }
-        
+
         public int CacheLineSize { get; private set; }
 
         public int CacheSize { get; private set; }
@@ -179,15 +179,15 @@ namespace AsmJitTest
         public bool Sse { get; private set; }
 
         public bool Sse2 { get; private set; }
-        
+
         public bool Sse3 { get; private set; }
 
         public bool Sse41 { get; private set; }
-        
+
         public bool Sse42 { get; private set; }
-        
+
         public bool Avx { get; private set; }
-        
+
         public bool Avx2 { get; private set; }
     }
 }

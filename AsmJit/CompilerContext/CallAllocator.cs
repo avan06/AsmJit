@@ -10,8 +10,8 @@ namespace AsmJit.CompilerContext
 {
     internal sealed class CallAllocator : Allocator
     {
-        private RegisterMask _willAlloc = new RegisterMask();
-        private RegisterMask _willSpill = new RegisterMask();
+        private readonly RegisterMask _willAlloc = new RegisterMask();
+        private readonly RegisterMask _willSpill = new RegisterMask();
 
         public CallAllocator(Compiler compiler, CodeContext codeContext, Translator translator, VariableContext ctx) : base(compiler, codeContext, translator, ctx) { }
 
@@ -162,7 +162,7 @@ namespace AsmJit.CompilerContext
                 var m = va.InRegs;
                 if (rClass != RegisterClass.Gp || m != 0)
                 {
-                    if (m == 0) { throw new ArgumentException(); }
+                    if (m == 0) throw new ArgumentException();
                     va.InRegIndex = m.FindFirstBit();
                     willSpill |= occupied & m;
                     continue;
@@ -170,7 +170,7 @@ namespace AsmJit.CompilerContext
 
                 m = va.AllocableRegs & ~(willAlloc ^ m);
                 m = GuessAlloc(rClass, vd, m);
-                if (m == 0) { throw new ArgumentException(); }
+                if (m == 0) throw new ArgumentException();
 
                 var candidateRegs = m & ~occupied;
                 if (candidateRegs == 0)

@@ -23,51 +23,30 @@ namespace AsmJit.Common.Operands
         }
 
         public Memory ToMemory(int disp = 0) => new Memory(MemoryType.StackIndex, this, disp, Size);
-
-        public Memory ToMemory(GpVariable index, int shift = 0, int disp = 0) => new Memory(MemoryType.StackIndex, this, index, shift, disp, Size);
-
         public Memory ToMemory8(int disp = 0) => new Memory(MemoryType.StackIndex, this, disp, 1);
-
-        public Memory ToMemory8(GpVariable index, int shift = 0, int disp = 0) => new Memory(MemoryType.StackIndex, this, index, shift, disp, 1);
-
         public Memory ToMemory16(int disp = 0) => new Memory(MemoryType.StackIndex, this, disp, 2);
-
-        public Memory ToMemory16(GpVariable index, int shift = 0, int disp = 0) => new Memory(MemoryType.StackIndex, this, index, shift, disp, 2);
-
         public Memory ToMemory32(int disp = 0) => new Memory(MemoryType.StackIndex, this, disp, 4);
-
-        public Memory ToMemory32(GpVariable index, int shift = 0, int disp = 0) => new Memory(MemoryType.StackIndex, this, index, shift, disp, 4);
-
         public Memory ToMemory64(int disp = 0) => new Memory(MemoryType.StackIndex, this, disp, 8);
-
-        public Memory ToMemory64(GpVariable index, int shift = 0, int disp = 0) => new Memory(MemoryType.StackIndex, this, index, shift, disp, 8);
-
         public Memory ToMemory80(int disp = 0) => new Memory(MemoryType.StackIndex, this, disp, 10);
-
-        public Memory ToMemory80(GpVariable index, int shift = 0, int disp = 0) => new Memory(MemoryType.StackIndex, this, index, shift, disp, 10);
-
         public Memory ToMemory128(int disp = 0) => new Memory(MemoryType.StackIndex, this, disp, 16);
-
-        public Memory ToMemory128(GpVariable index, int shift = 0, int disp = 0) => new Memory(MemoryType.StackIndex, this, index, shift, disp, 16);
-
         public Memory ToMemory256(int disp = 0) => new Memory(MemoryType.StackIndex, this, disp, 32);
-
-        public Memory ToMemory256(GpVariable index, int shift = 0, int disp = 0) => new Memory(MemoryType.StackIndex, this, index, shift, disp, 32);
-
         public Memory ToMemory512(int disp = 0) => new Memory(MemoryType.StackIndex, this, disp, 64);
 
+        public Memory ToMemory(GpVariable index, int shift = 0, int disp = 0) => new Memory(MemoryType.StackIndex, this, index, shift, disp, Size);
+        public Memory ToMemory8(GpVariable index, int shift = 0, int disp = 0) => new Memory(MemoryType.StackIndex, this, index, shift, disp, 1);
+        public Memory ToMemory16(GpVariable index, int shift = 0, int disp = 0) => new Memory(MemoryType.StackIndex, this, index, shift, disp, 2);
+        public Memory ToMemory32(GpVariable index, int shift = 0, int disp = 0) => new Memory(MemoryType.StackIndex, this, index, shift, disp, 4);
+        public Memory ToMemory64(GpVariable index, int shift = 0, int disp = 0) => new Memory(MemoryType.StackIndex, this, index, shift, disp, 8);
+        public Memory ToMemory80(GpVariable index, int shift = 0, int disp = 0) => new Memory(MemoryType.StackIndex, this, index, shift, disp, 10);
+        public Memory ToMemory128(GpVariable index, int shift = 0, int disp = 0) => new Memory(MemoryType.StackIndex, this, index, shift, disp, 16);
+        public Memory ToMemory256(GpVariable index, int shift = 0, int disp = 0) => new Memory(MemoryType.StackIndex, this, index, shift, disp, 32);
         public Memory ToMemory512(GpVariable index, int shift = 0, int disp = 0) => new Memory(MemoryType.StackIndex, this, index, shift, disp, 64);
 
         public GpVariable As8() => new GpVariable(this, GpRegisterType.GpbLo, 1);
-
         public GpVariable As8Lo() => new GpVariable(this, GpRegisterType.GpbLo, 1);
-
         public GpVariable As8Hi() => new GpVariable(this, GpRegisterType.GpbHi, 1);
-
         public GpVariable As16() => new GpVariable(this, GpRegisterType.Gpw, 2);
-
         public GpVariable As32() => new GpVariable(this, GpRegisterType.Gpd, 4);
-
         public GpVariable As64() => new GpVariable(this, GpRegisterType.Gpq, 8);
     }
 }

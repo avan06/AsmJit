@@ -32,16 +32,15 @@ namespace AsmJitTest.TestCases
 //0000021a7769004e 48 8b 4c 24 e8                 mov rcx, [rsp-0x18]
 //0000021a77690053 48 8b 54 24 e0                 mov rdx, [rsp-0x20]
 //0000021a77690058 eb e2                          jmp 0x21a7769003c
-            var dst = c.SetArgument(c.IntPtr("dst"));
-            var src = c.SetArgument(c.IntPtr("src"));
-            var cnt = c.SetArgument(c.UIntPtr("cnt"));
+            var dst = c.IntPtr("dst");
+            var src = c.IntPtr("src");
+            var cnt = c.UIntPtr("cnt");
 
             var loop = c.Label(); // Create base labels we use
             var exit = c.Label(); // in our function.
 
-            c.Allocate(dst); // Allocate all registers now,
-            c.Allocate(src); // because we want to keep them
-            c.Allocate(cnt); // in physical registers only.
+            c.SetArgument(dst, src, cnt);
+            c.Allocate(dst, src, cnt); // Allocate all registers now, because we want to keep them in physical registers only.
 
             c.Emit(
                 Inst.Test, cnt, cnt, // Exit if length is zero.

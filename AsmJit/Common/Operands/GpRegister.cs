@@ -4,7 +4,7 @@ namespace AsmJit.Common.Operands
 {
     public sealed class GpRegister : Register
     {
-        private static Dictionary<GpRegisterType, int> _sizeMap = new Dictionary<GpRegisterType, int>
+        private static readonly Dictionary<GpRegisterType, int> _sizeMap = new Dictionary<GpRegisterType, int>
         {
             {GpRegisterType.GpbLo, 1},
             {GpRegisterType.GpbHi, 1},

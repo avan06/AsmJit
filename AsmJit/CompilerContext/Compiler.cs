@@ -10,8 +10,8 @@ namespace AsmJit.CompilerContext
 {
     public sealed class Compiler : CompilerBase
     {
-        private ConstantPool _localConstPool = new ConstantPool();
-        private ConstantPool _globalConstPool = new ConstantPool();
+        private readonly ConstantPool _localConstPool = new ConstantPool();
+        private readonly ConstantPool _globalConstPool = new ConstantPool();
 
         private FunctionNode _function;
         private CodeProcessor _codeProcessor;
@@ -49,12 +49,8 @@ namespace AsmJit.CompilerContext
             return ctx;
         }
 
-        internal void CreateReturn(Operand o0 = null, Operand o1 = null)
-        {
-            var node = new ReturnNode(o0, o1);
-            AddNode(node);
-        }
-        
+        internal void CreateReturn(Operand o0 = null, Operand o1 = null) => AddNode(new ReturnNode(o0, o1));
+
         internal T SetArgument<T>(int i, T v) where T : Variable
         {
             if (!v.Id.IsVariableId()) throw new ArgumentException();
@@ -68,33 +64,26 @@ namespace AsmJit.CompilerContext
 
         internal Label GetExitLabel() => new Label(_function.Exit.LabelId);
 
-        internal void Embed(Pointer data, int size)
-        {
-            var node = CreateDataNode(data, size);
-            AddNode(node);
-        }
+        internal void Embed(Pointer data, int size) => AddNode(CreateDataNode(data, size));
 
         internal void Spill(Variable variable)
         {
             if (variable.Id == Constants.InvalidId) return;
-            var node = CreateHintNode(variable, VariableHint.Spill, Constants.InvalidValue);
-            AddNode(node);
+            var node = AddNode(CreateHintNode(variable, VariableHint.Spill, Constants.InvalidValue));
         }
 
         internal void Allocate(Variable variable, Register r = null)
         {
             if (variable.Id == Constants.InvalidId) return;
-            HintNode node = r == null ?
-                CreateHintNode(variable, VariableHint.Spill, Constants.InvalidValue) : 
-                CreateHintNode(variable, VariableHint.Alloc, r.Index);
-            AddNode(node);
+            HintNode node = AddNode(r == null ?
+                CreateHintNode(variable, VariableHint.Spill, Constants.InvalidValue) :
+                CreateHintNode(variable, VariableHint.Alloc, r.Index));
         }
 
         internal void Unuse(Variable variable)
         {
             if (variable.Id == Constants.InvalidId) return;
-            var node = CreateHintNode(variable, VariableHint.Unuse, Constants.InvalidValue);
-            AddNode(node);
+            var node = AddNode(CreateHintNode(variable, VariableHint.Unuse, Constants.InvalidValue));
         }
 
         internal Memory CreateConstant(ConstantScope scope, Pointer data, int size)
@@ -123,10 +112,9 @@ namespace AsmJit.CompilerContext
 
         internal CallNode CreateCall(Operand op, FunctionDeclaration fn = null)
         {
-            var node = fn == null ?
+            var node = AddNode(fn == null ?
                 new CallNode(op, _function.FunctionDeclaration) :
-                new CallNode(op, fn);
-            AddNode(node);
+                new CallNode(op, fn));
             return node;
         }
 
@@ -196,11 +184,7 @@ namespace AsmJit.CompilerContext
             Finish();
         }
 
-        internal void Align(AligningMode mode, int offset)
-        {
-            var node = new AlignNode(mode, offset);
-            AddNode(node);
-        }
+        internal void Align(AligningMode mode, int offset) => AddNode(new AlignNode(mode, offset));
 
         private HintNode CreateHintNode(Variable var, VariableHint hint, int value)
         {
