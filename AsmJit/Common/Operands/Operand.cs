@@ -11,12 +11,7 @@
             OperandType = type;
         }
 
-        protected Operand(OperandType type, int size)
-        {
-            Id = Constants.InvalidId;
-            OperandType = type;
-            Size = size;
-        }
+        protected Operand(OperandType type, int size) : this(type) => Size = size;
 
         protected Operand(Operand other)
         {

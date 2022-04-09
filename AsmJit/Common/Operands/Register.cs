@@ -2,7 +2,7 @@ using System;
 
 namespace AsmJit.Common.Operands
 {
-    public abstract class Register : Operand
+    public abstract class Register : RegisterBase
     {
         protected Register() : base(OperandType.Register)
         {
@@ -11,18 +11,6 @@ namespace AsmJit.Common.Operands
         }
 
         protected Register(Register other) : base(other) { }
-
-        internal int Index
-        {
-            get => Reserved0;
-            set => Reserved0 = value;
-        }
-
-        internal RegisterType RegisterType
-        {
-            get => (RegisterType)Reserved1;
-            set => Reserved1 = (int)value;
-        }
 
         internal static Register FromVariable(Variable var, int index)
         {
@@ -54,30 +42,6 @@ namespace AsmJit.Common.Operands
                     throw new ArgumentOutOfRangeException();
             }
         }
-
-        internal bool IsGp() => RegisterType >= RegisterType.GpbLo && RegisterType <= RegisterType.Gpq;
-
-        internal bool IsGpb() => RegisterType >= RegisterType.GpbLo && RegisterType <= RegisterType.GpbHi;
-
-        internal bool IsGpbLo() => RegisterType == RegisterType.GpbLo;
-
-        internal bool IsGpbHi() => RegisterType == RegisterType.GpbHi;
-
-        internal bool IsGpw() => RegisterType == RegisterType.Gpw;
-
-        internal bool IsGpd() => RegisterType == RegisterType.Gpd;
-
-        internal bool IsGpq() => RegisterType == RegisterType.Gpq;
-
-        internal bool IsMm() => RegisterType == RegisterType.Mm;
-
-        internal bool IsK() => RegisterType == RegisterType.K;
-
-        internal bool IsXmm() => RegisterType == RegisterType.Xmm;
-
-        internal bool IsYmm() => RegisterType == RegisterType.Ymm;
-
-        internal bool IsZmm() => RegisterType == RegisterType.Zmm;
 
         public override string ToString() => string.Format("[{0}: Id={1}, Size={2}, Type={3}, Idx={4}]", OperandType, Id == Constants.InvalidId ? "#" : Id.ToString(), Size, RegisterType, Index == RegisterIndex.Invalid ? "#" : Index.ToString());
     }

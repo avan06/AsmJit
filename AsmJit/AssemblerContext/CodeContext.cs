@@ -77,20 +77,20 @@ namespace AsmJit.AssemblerContext
                     dynamic operand;
                     var opName = insts[idx2];
                     if (Regex.Match(opName, @"\[ *([^ \]]+) *([\+\-]) *([^ \]]+) *([\+\-]) *([^ \]]+) *\]") is Match m1 && m1.Success)
-                    {
+                    { //op0 +/- op1 +/- op2
                         var op0 = OpParse(m1.Groups[1].Value);
                         var op1 = OpParse(m1.Groups[3].Value, m1.Groups[2].Value == "-", OpType.Int);
                         var op2 = OpParse(m1.Groups[5].Value, m1.Groups[4].Value == "-", OpType.Int);
                         operand = Constants.X64 ? Memory.QWord(op0, op1, 0, op2) : Memory.DWord(op0, op1, 0, op2);
                     }
                     else if (Regex.Match(opName, @"\[ *([^ \]]+) *([\+\-]) *([^ \]]+) *\]") is Match m2 && m2.Success)
-                    {
+                    { //op0 +/- op1
                         var op0 = OpParse(m2.Groups[1].Value);
                         var op1 = OpParse(m2.Groups[3].Value, m2.Groups[2].Value == "-", OpType.Int);
                         operand = Constants.X64 ? Memory.QWord(op0, op1) : Memory.DWord(op0, op1);
                     }
                     else if (Regex.Match(opName, @"\[ *([\+\-]*) *([^ \]]+) *\]") is Match m3 && m3.Success)
-                    {
+                    { //+/- op0
                         var op0 = OpParse(m3.Groups[2].Value, m3.Groups[1].Value == "-", OpType.Ptr);
                         operand = Constants.X64 ? Memory.QWordAbs(op0) : Memory.DWordAbs(op0);
                     }

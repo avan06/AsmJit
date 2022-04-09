@@ -8,12 +8,18 @@ namespace AsmJitTest.TestCases
     {
         protected override void Compile(CodeContext c)
         {
-//            c.Emit(@"
-//mov al, [eax+ebx+0x80]
-//mov al, [eax+ebx]
-//mov al, [eax+0x80]
-//mov al, [0x13d3000000040027]
-//");
+            //var R = Cpu.Registers;
+            //c.Emit(Inst.Mov, R.Al, Memory.QWord(R.Eax, R.Ebx, 0, 0x80));
+            //c.Emit(Inst.Lea, R.Rcx, Memory.QWord(R.Eax, R.Rip, 0x2a8c)); //lea   rcx,[rip+0x2a8c] 
+            //c.Emit(Inst.Mov, R.Al, Memory.QWord(R.Eax, 0x80));
+            //c.Emit(Inst.Mov, R.Al, Memory.QWordAbs((IntPtr)(0x13d3000000040027 & 0xFFFFFFFFu), R.Eax));
+
+            //            c.Emit(@"
+            //mov al, [eax+ebx+0x80]
+            //mov al, [eax+ebx]
+            //mov al, [eax+0x80]
+            //mov al, [0x13d3000000040027]
+            //");
             c.Emit(@"
 mov eax, 200
 mov ecx, 33

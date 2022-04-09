@@ -1,206 +1,115 @@
 using System;
-using AsmJit.Common.Extensions;
 
 namespace AsmJit.Common.Operands
 {
     public class Memory : Operand
     {
-        internal Memory() : base(OperandType.Memory)
-        {
-            MemoryType = MemoryType.BaseIndex;
-            Displacement = 0;
-            Index = RegisterIndex.Invalid;
-            Base = RegisterIndex.Invalid;
-        }
+        internal Memory() : this(MemoryType.BaseIndex) => Base = RegisterIndex.Invalid;
 
         internal Memory(Memory other) : base(other) { }
 
         internal Memory(Memory other, int size) : base(other) => Size = size;
 
-        internal Memory(RipRegister rip, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            MemoryType = MemoryType.Rip;
-            Displacement = disp;
-            Index = RegisterIndex.Invalid;
-        }
+        internal Memory(MemoryType memType) : this(memType, 0, 0) { }
 
-        internal Memory(MemoryType memType) : base(OperandType.Memory)
-        {
-            MemoryType = memType;
-            Displacement = 0;
-            Index = RegisterIndex.Invalid;
-        }
+        internal Memory(MemoryType memType, int disp, int size) : this(memType, null, disp, size) { }
 
-        internal Memory(MemoryType memType, GpVariable @base, int disp, int size) : base(OperandType.Memory, size)
-        {
-            Id = @base.Id;
-            MemoryType = memType;
-            Displacement = disp;
-            Index = RegisterIndex.Invalid;
-        }
-
-        internal Memory(MemoryType memType, GpVariable index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            MemoryType = memType;
-            Displacement = disp;
-            Index = index.RegisterIndex;
-
-            var flags = shift << Constants.X86.MemShiftIndex;
-            if (index.IsGp()) flags |= GetGpdFlags(index);
-            else if (index.IsXmm()) flags |= Constants.X86.MemVSibXmm << Constants.X86.MemVSibIndex;
-            else if (index.IsYmm()) flags |= Constants.X86.MemVSibYmm << Constants.X86.MemVSibIndex;
-            Flags = flags;
-        }
+        internal Memory(MemoryType memType, GpVariable @base, int disp, int size) : this(memType, @base, null, 0, disp, size) { }
 
         internal Memory(MemoryType memType, GpVariable @base, GpVariable index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
         {
-            Id = @base.Id;
             MemoryType = memType;
             Displacement = disp;
-            Index = index.Id;
-            Flags = shift << Constants.X86.MemShiftIndex;
-        }
-        
-        ////////////////////////////////////
-        internal Memory(GpRegister @base, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            Id = @base.Index;
-            MemoryType = MemoryType.BaseIndex;
-            Displacement = disp;
-            Index = RegisterIndex.Invalid;
-            Flags = GetGpdFlags(@base) + (Constants.X86.MemVSibGpz << Constants.X86.MemVSibIndex);
+            if (@base != null) Id = @base.Id;
+            if (index != null)
+            {
+                Index = index.Id;
+                Flags = shift << Constants.X86.MemShiftIndex;
+            }
+            else Index = RegisterIndex.Invalid;
         }
 
-        internal Memory(GpRegister @base, GpRegister index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            Id = @base.Index;
-            MemoryType = MemoryType.BaseIndex;
-            Displacement = disp;
-            Index = index.Index;
-            Flags = GetGpdFlags(@base) + (shift << Constants.X86.MemShiftIndex);
-        }
-
-        internal Memory(GpRegister @base, XmmRegister index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            Id = @base.Index;
-            MemoryType = MemoryType.BaseIndex;
-            Displacement = disp;
-            Index = index.Index;
-            Flags = GetGpdFlags(@base) + (Constants.X86.MemVSibXmm << Constants.X86.MemVSibIndex) + (shift << Constants.X86.MemShiftIndex);
-        }
-
-        internal Memory(GpRegister @base, YmmRegister index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            Id = @base.Index;
-            MemoryType = MemoryType.BaseIndex;
-            Displacement = disp;
-            Index = index.Index;
-            Flags = GetGpdFlags(@base) + (Constants.X86.MemVSibYmm << Constants.X86.MemVSibIndex) + (shift << Constants.X86.MemShiftIndex);
-        }
-
-        internal Memory(Label label, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            Id = label.Id;
-            MemoryType = MemoryType.Label;
-            Displacement = disp;
-            Index = RegisterIndex.Invalid;
-        }
-
-        internal Memory(Label label, GpRegister index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            Id = label.Id;
-            MemoryType = MemoryType.Label;
-            Displacement = disp;
-            Index = index.Index;
-            Flags = (Constants.X86.MemVSibGpz << Constants.X86.MemVSibIndex) + (shift << Constants.X86.MemShiftIndex);
-        }
-
-        internal Memory(Label label, GpVariable index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            Id = label.Id;
-            MemoryType = MemoryType.Label;
-            Displacement = disp;
-            Index = index.Id;
-            Flags = GetGpdFlags(index) + (shift << Constants.X86.MemShiftIndex);
-        }
-
-        internal Memory(GpVariable @base, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            Id = @base.Id;
-            MemoryType = MemoryType.BaseIndex;
-            Displacement = disp;
-            Index = RegisterIndex.Invalid;
-            Flags = GetGpdFlags(@base) + (Constants.X86.MemVSibGpz << Constants.X86.MemVSibIndex);
-        }
-
-        internal Memory(GpVariable @base, GpVariable index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            Id = @base.Id;
-            MemoryType = MemoryType.BaseIndex;
-            Displacement = disp;
-            Index = index.Id;
-            Flags = GetGpdFlags(@base) + (shift << Constants.X86.MemShiftIndex);
-        }
-
-        internal Memory(GpVariable @base, XmmVariable index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            Id = @base.Id;
-            MemoryType = MemoryType.Label;
-            Displacement = disp;
-            Index = index.Id;
-            Flags = GetGpdFlags(@base) + (Constants.X86.MemVSibXmm << Constants.X86.MemVSibIndex) + (shift << Constants.X86.MemShiftIndex);
-        }
-
-        internal Memory(GpVariable @base, YmmVariable index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
-        {
-            Id = @base.Id;
-            MemoryType = MemoryType.Label;
-            Displacement = disp;
-            Index = index.Id;
-            Flags = GetGpdFlags(@base) + (Constants.X86.MemVSibYmm << Constants.X86.MemVSibIndex) + (shift << Constants.X86.MemShiftIndex);
-        }
-
-        internal Memory(MemoryType memType, int disp, int size) : base(OperandType.Memory, size)
-        {
-            MemoryType = memType;
-            Displacement = disp;
-            Index = RegisterIndex.Invalid;
-        }
-
-        internal Memory(MemoryType memType, Register index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
+        internal Memory(MemoryType memType, RegisterBase index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
         {
             MemoryType = memType;
             Displacement = disp;
             Index = index.Index;
-
             var flags = shift << Constants.X86.MemShiftIndex;
+
             if (index.IsGp()) flags |= GetGpdFlags(index);
             else if (index.IsXmm()) flags |= Constants.X86.MemVSibXmm << Constants.X86.MemVSibIndex;
             else if (index.IsYmm()) flags |= Constants.X86.MemVSibYmm << Constants.X86.MemVSibIndex;
+
             Flags = flags;
         }
+        internal Memory(Variable index, int shift, int disp, int size) : this(MemoryType.Absolute, index, shift, disp, size) => Index = index.Id;
 
-        internal Memory(Variable index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
+        internal Memory(Operand @base, int disp, int size = 0) : base(OperandType.Memory, size)
         {
-            MemoryType = MemoryType.Absolute;
             Displacement = disp;
-            Index = index.Id;
+            Index = RegisterIndex.Invalid;
+            if (@base is RipRegister)
+            {
+                MemoryType = MemoryType.Rip;
+                return;
+            }
+            Id = @base.Id;
 
-            var flags = shift << Constants.X86.MemShiftIndex;
-            var indexRegType = index.RegisterType;
-            if (indexRegType <= RegisterType.Gpq) flags |= GetGpdFlags(index);
-            else switch (indexRegType)
-                {
-                    case RegisterType.Xmm:
-                        flags |= Constants.X86.MemVSibXmm << Constants.X86.MemVSibIndex;
-                        break;
-                    case RegisterType.Ymm:
-                        flags |= Constants.X86.MemVSibYmm << Constants.X86.MemVSibIndex;
-                        break;
-                }
-            Flags = flags;
+            switch (@base)
+            {
+                case Label _:
+                    MemoryType = MemoryType.Label;
+                    break;
+                case GpRegister _:
+                case GpVariable _:
+                    if (@base is GpRegister regBase) Id = regBase.Index;
+                    MemoryType = MemoryType.BaseIndex;
+                    Flags = GetGpdFlags(@base) + (Constants.X86.MemVSibGpz << Constants.X86.MemVSibIndex);
+                    break;
+                default:
+                    throw new ArgumentException();
+            }
         }
-        ////////////////////////////////////
+
+        internal Memory(Operand @base, RegisterBase index, int shift, int disp, int size = 0) : base(OperandType.Memory, size)
+        {
+            Displacement = disp;
+            if (@base is Label)
+            {
+                Id = @base.Id;
+                MemoryType = MemoryType.Label;
+                if (index is GpRegister rIndex)
+                {
+                    Index = rIndex.Index;
+                    Flags = (Constants.X86.MemVSibGpz << Constants.X86.MemVSibIndex) + (shift << Constants.X86.MemShiftIndex);
+                }
+                else if (index is GpVariable)
+                {
+                    Index = index.Id;
+                    Flags = GetGpdFlags(index) + (shift << Constants.X86.MemShiftIndex);
+                }
+                else throw new ArgumentException();
+                return;
+            }
+            else if ((!(@base is GpRegister) || !(index is Register)) && (!(@base is GpVariable) || !(index is Variable))) throw new ArgumentException();
+
+            MemoryType = MemoryType.BaseIndex;
+            Flags = GetGpdFlags(@base) + (shift << Constants.X86.MemShiftIndex);
+
+            if (index is Register)
+            {
+                Id = ((Register)@base).Index;
+                Index = index.Index;
+            }
+            else if (index is Variable)
+            {
+                Id = @base.Id;
+                Index = index.Id;
+                if (index is XmmVariable || index is YmmVariable) MemoryType = MemoryType.Label;
+            }
+            if (index.IsXmm()) Flags += (Constants.X86.MemVSibXmm << Constants.X86.MemVSibIndex);
+            else if (index.IsYmm()) Flags += (Constants.X86.MemVSibYmm << Constants.X86.MemVSibIndex);
+        }
 
         private int GetGpdFlags(Operand @base) => (@base.Size & 4) << (Constants.X86.MemGpdIndex - 2);
 
@@ -271,17 +180,7 @@ namespace AsmJit.Common.Operands
         /// <summary>
         /// Creates `[base + disp]` memory operand.
         /// </summary>
-        public static Memory Ptr(Operand @base, int disp = 0, int size = 0)
-        {
-            dynamic caseBase;
-            if (@base is Label label) caseBase = label;
-            else if (@base is GpRegister regBase) caseBase = regBase;
-            else if (@base is RipRegister ripRegister) caseBase = ripRegister;
-            else if (@base is GpVariable gpVariable) caseBase = gpVariable;
-            else throw new ArgumentException();
-
-            return new Memory(caseBase, disp, size);
-        }
+        public static Memory Ptr(Operand @base, int disp = 0, int size = 0) => new Memory(@base, disp, size);
         public static Memory Byte(Operand @base, int disp = 0) => Ptr(@base, disp, 1);
         public static Memory Word(Operand @base, int disp = 0) => Ptr(@base, disp, 2);
         public static Memory DWord(Operand @base, int disp = 0) => Ptr(@base, disp, 4);
@@ -294,31 +193,17 @@ namespace AsmJit.Common.Operands
         /// <summary>
         /// Creates `[base + (index << shift) + disp]` memory operand (scalar&vector index).
         /// </summary>
-        public static Memory Ptr(Operand rawBase, Operand rawIndex, int shift = 0, int disp = 0, int size = 0)
+        public static Memory Ptr(Operand @base, Operand index, int shift = 0, int disp = 0, int size = 0)
         {
-            dynamic @base;
-            dynamic index;
-            bool isLabel = false;
-            if (rawBase is Label label)
+            if (@base is Label)
             {
-                @base = label;
-                isLabel = true;
+                if (!(index is GpRegister) && !(index is GpVariable)) throw new ArgumentException();
             }
-            else if (rawBase is GpRegister regBase) @base = regBase;
-            else if (rawBase is GpVariable varBase) @base = varBase;
-            else throw new ArgumentException();
+            else if (!(@base is GpRegister) && !(@base is GpVariable)) throw new ArgumentException();
 
-            if (isLabel && !(rawIndex is GpRegister) && !(rawIndex is GpVariable)) throw new ArgumentException();
+            if (!(index is Register) && !(index is Variable)) throw new ArgumentException();
 
-            else if (rawIndex is GpRegister gpRegister) index = gpRegister;
-            else if (rawIndex is XmmRegister xmmRegister) index = xmmRegister;
-            else if (rawIndex is YmmRegister ymmRegister) index = ymmRegister;
-            else if (rawIndex is GpVariable gpVariable) index = gpVariable;
-            else if (rawIndex is XmmVariable xmmVariable) index = xmmVariable;
-            else if (rawIndex is YmmVariable ymmVariable) index = ymmVariable;
-            else throw new ArgumentException();
-
-            return new Memory(@base, index, shift, disp, size);
+            return new Memory(@base, (dynamic)index, shift, disp, size);
         }
         public static Memory Byte(Operand @base, Operand index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 1);
         public static Memory Word(Operand @base, Operand index, int shift = 0, int disp = 0) => Ptr(@base, index, shift, disp, 2);
@@ -332,21 +217,20 @@ namespace AsmJit.Common.Operands
         /// <summary>
         /// Creates `[base + (index << shift) + disp]` absolute memory operand.
         /// </summary>
-        public static Memory PtrAbs(IntPtr pAbs, Operand rawIndex = null, int shift = 0, int disp = 0, int size = 0)
+        public static Memory PtrAbs(IntPtr pAbs, Operand index = null, int shift = 0, int disp = 0, int size = 0)
         {
-            dynamic index = rawIndex;
-            switch (rawIndex)
+            switch (index)
             {
                 case null:
                     return new Memory(MemoryType.Absolute, (int)(pAbs + disp), size);
                 case GpRegister _:
                 case XmmRegister _:
                 case YmmRegister _:
-                    return new Memory(MemoryType.Absolute, index, shift, (int)(pAbs + disp), size);
+                    return new Memory(MemoryType.Absolute, (Register)index, shift, (int)(pAbs + disp), size);
                 case GpVariable _:
                 case XmmVariable _:
                 case YmmVariable _:
-                    return new Memory(index, (int)(pAbs + disp), shift, size);
+                    return new Memory((Variable)index, shift, (int)(pAbs + disp), size);
                 default:
                     throw new ArgumentException();
             }

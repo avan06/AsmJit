@@ -21,15 +21,16 @@ namespace AsmJit.CompilerContext
         private const int ArgActualDisp = 0;
         private const int VarActualDisp = 0;
 
+        private readonly AssemblerBase _assemblerBase;
+        private readonly Compiler _compiler;
+        private readonly CodeContext _codeContext;
+        private readonly FunctionNode _functionNode;
+        private readonly VariableContext _variableContext;
+        private readonly Memory _memSlot;
         private CodeNode _node;
         private CodeNode _next;
         private CodeNode _stopNode;
-        private AssemblerBase _assemblerBase;
-        private Compiler _compiler;
-        private CodeContext _codeContext;
-        private FunctionNode _functionNode;
         private CodeNode _extraBlock;
-        private VariableContext _variableContext;
         private VariableCell _memVarCells;
         private VariableCell _memStackCells;
         private int _mem1ByteVarsUsed;
@@ -41,7 +42,6 @@ namespace AsmJit.CompilerContext
         private int _mem64ByteVarsUsed;
         private int _memMaxAlign;
         private int _memAllTotal;
-        private Memory _memSlot;
         private VariableCell _stackFrameCell;
         private int _argBaseReg;
         private int _varBaseReg;

@@ -1,6 +1,6 @@
 namespace AsmJit.Common.Operands
 {
-    public abstract class Variable : Operand
+    public abstract class Variable : RegisterBase
     {
         protected Variable(VariableType type) : base(OperandType.Variable) => VariableType = type;
 
@@ -12,24 +12,10 @@ namespace AsmJit.Common.Operands
             private set => Reserved2 = (int)value;
         }
 
-        internal int RegisterIndex
-        {
-            get => Reserved0;
-            set => Reserved0 = value;
-        }
-
-        internal RegisterType RegisterType
-        {
-            get => (RegisterType)Reserved1;
-            set => Reserved1 = (int)value;
-        }
-
         internal override T As<T>()
         {
-            if (typeof(T) == typeof(Register))
-            {
-                return Register.FromVariable(this, RegisterIndex) as T;
-            }
+            if (typeof(T) == typeof(Register)) return Register.FromVariable(this, Index) as T;
+
             return base.As<T>();
         }
     }

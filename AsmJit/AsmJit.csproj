@@ -48,8 +48,8 @@
     <Compile Include="Common\Enums\AssemblerFeatures.cs" />
     <Compile Include="Common\AssemblerBase.cs" />
     <Compile Include="Common\CodeBuffer.cs" />
-    <Compile Include="Common\Extensions\VariableExtensions.cs" />
     <Compile Include="Common\Inst.cs" />
+    <Compile Include="Common\Operands\RegisterBase.cs" />
     <Compile Include="CompilerContext\CompilerBase.cs" />
     <Compile Include="Common\Data.cs" />
     <Compile Include="Common\Enums\PointerFlags.cs" />
