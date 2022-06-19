@@ -10,7 +10,7 @@ namespace AsmJitTest
 {
     class Program
     {
-        private static readonly bool _generateAsmListing = true;
+        private static readonly bool _generateAsmListing = false;
 
         static void Main()
         {
@@ -81,6 +81,7 @@ namespace AsmJitTest
 
             tr.Add(new RawAssembler());
             tr.Add(new RawAssembler2());
+            tr.Add(new RawAssembler3());
 
             var resTrue = 0;
             var resFalse = 0;

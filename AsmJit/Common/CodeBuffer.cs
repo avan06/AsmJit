@@ -67,6 +67,18 @@ namespace AsmJit.Common
             Trampoline = 3
         }
 
+        private enum EmitType
+        {
+            X86Op,
+            X86OpWithOpReg,
+            X86R,
+            X86M,
+            AvxR,
+            AvxM,
+            AvxMAndSib,
+            XopR,
+            XopMAndSib,
+        }
         private sealed class RelocationData
         {
             internal Pointer Data;
@@ -118,9 +130,9 @@ namespace AsmJit.Common
             Cpu.GpbHi(7)
         };
 
-        private static readonly byte[] _segmentPrefix = { 0x00, 0x26, 0x2E, 0x36, 0x3E, 0x64, 0x65 };
-        private static readonly byte[] _opCodePushSeg = { 0x00, 0x06, 0x0E, 0x16, 0x1E, 0xA0, 0xA8 };
-        private static readonly byte[] _opCodePopSeg = { 0x00, 0x07, 0x00, 0x17, 0x1F, 0xA1, 0xA9 };
+        private static readonly byte[] _segmentPrefix = { 0x00, 0x26, 0x2E, 0x36, 0x3E, 0x64, 0x65 }; //none、es、cs、ss、ds、fs、gs
+        private static readonly byte[] _opCodePushSeg = { 0x00, 0x06, 0x0E, 0x16, 0x1E, 0xA0, 0xA8 }; //none、es、cs、ss、ds、fs、gs (X86Push)
+        private static readonly byte[] _opCodePopSeg  = { 0x00, 0x07, 0x00, 0x17, 0x1F, 0xA1, 0xA9 }; //none、es、cs、ss、ds、fs、gs (X86Pop)
 
         private readonly EmitContextData _eh = new EmitContextData();
         private readonly AssemblerBase _assemblerBase;
@@ -526,6 +538,7 @@ namespace AsmJit.Common
 
             var encoding = extendedInfo.Encoding;
             var isContinue = true;
+
             while (isContinue)
             {
                 isContinue = false;
@@ -534,1147 +547,110 @@ namespace AsmJit.Common
                     case InstructionEncoding.None:
                         break;
                     case InstructionEncoding.X86Op:
-                        EmitX86();
+                        EmitX86(EmitType.X86Op);
                         break;
                     case InstructionEncoding.X86Op_66H:
                         Add66Hp(1);
                         encoding = InstructionEncoding.X86Op;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.X86Rm:
-                        Add66HpBySize(op0.Size);
-                        AddRexWBySize(op0.Size);
-                        if (OperandsAre(OperandType.Register))
-                        {
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory))
-                        {
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.X86Rm: //ok
                         break;
                     case InstructionEncoding.X86Rm_B:
-                        _eh.OpCode += (_eh.Operand0.Size != 1).AsUInt();
+                        _eh.OpCode += (op0.Size != 1).AsUInt();
                         encoding = InstructionEncoding.X86Rm;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.X86RmReg:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            _eh.OpCode += (op0.Size != 1).AsUInt();
-                            Add66HpBySize(op0.Size);
-                            AddRexWBySize(op0.Size);
-
-                            _eh.Operand = (uint)OpReg(op1);
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitX86(true);
-                            break;
-                        }
-                        if (OperandsAre(OperandType.Memory, OperandType.Register))
-                        {
-                            _eh.OpCode += (op1.Size != 1).AsUInt();
-                            Add66HpBySize(op1.Size);
-                            AddRexWBySize(op1.Size);
-
-                            _eh.Operand = (uint)OpReg(op1);
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.X86RmReg:  //ok
                         break;
-                    case InstructionEncoding.X86RegRm:
-                        Add66HpBySize(op0.Size);
-                        AddRexWBySize(op0.Size);
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            if (op0.Size == 1 || op0.Size != op1.Size) throw new ArgumentException(string.Format("IllegalInstruction: Operands are Register & Register, but size is 1 or both are different sizes(op0 size:{0}, op1 size:{1})", op0.Size, op1.Size));
-
-                            _eh.Operand = (uint)OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            if (op0.Size == 1) throw new ArgumentException("IllegalInstruction: Operands are Register & Memory, but op0 size is 1)");
-
-                            _eh.Operand = (uint)OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.X86RegRm:  //ok
                         break;
-                    case InstructionEncoding.X86M:
-                        if (OperandsAre(OperandType.Memory))
-                        {
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.X86M:  //ok
                         break;
-                    case InstructionEncoding.X86Arith:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            _eh.OpCode += (op0.Size != 1).AsUInt() + 2;
-                            Add66HpBySize(op0.Size);
-                            AddRexWBySize(op0.Size);
-
-                            _eh.Operand = (uint)OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.OpCode += (op0.Size != 1).AsUInt() + 2;
-                            Add66HpBySize(op0.Size);
-                            AddRexWBySize(op0.Size);
-
-                            _eh.Operand = (uint)OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitX86(false, true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Register))
-                        {
-                            _eh.OpCode += (op1.Size != 1).AsUInt();
-                            Add66HpBySize(op1.Size);
-                            AddRexWBySize(op1.Size);
-
-                            _eh.Operand = (uint)OpReg(op1);
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                            break;
-                        }
-
-                        // The remaining instructions use 0x80 opcode.
-                        _eh.OpCode = 0x80;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Immediate))
-                        {
-                            _eh.ImmediateValue = op1.As<Immediate>().Int64;
-                            _eh.ImmediateLength = _eh.ImmediateValue.IsInt8() ? 1 : Math.Min(op0.Size, 4);
-                            _eh.ModRmRegister = OpReg(op0);
-
-                            Add66HpBySize(op0.Size);
-                            AddRexWBySize(op0.Size);
-
-                            // Alternate Form - AL, AX, EAX, RAX.
-                            if (_eh.ModRmRegister == 0 && (op0.Size == 1 || _eh.ImmediateLength != 1))
-                            {
-                                _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
-                                _eh.OpCode |= (_eh.Operand << 3) | (0x04 + (op0.Size != 1).AsUInt());
-                                _eh.ImmediateLength = Math.Min(op0.Size, 4);
-                                EmitX86();
-                                break;
-                            }
-
-                            _eh.OpCode += (uint)(op0.Size != 1 ? (_eh.ImmediateLength != 1 ? 1 : 3) : 0);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Immediate))
-                        {
-                            var memSize = op0.Size;
-
-                            if (memSize == 0) throw new ArgumentException("IllegalInstruction: Operands are Memory & Immediate, but op0 size is 0");
-
-                            _eh.ImmediateValue = op1.As<Immediate>().Int64;
-                            _eh.ImmediateLength = _eh.ImmediateValue.IsInt8() ? 1 : Math.Min(memSize, 4);
-
-                            _eh.OpCode += (uint)(memSize != 1 ? (_eh.ImmediateLength != 1 ? 1 : 3) : 0);
-                            Add66HpBySize(memSize);
-                            AddRexWBySize(memSize);
-
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.X86Arith:  //ok
                         break;
-                    case InstructionEncoding.X86BSwap:
-                        if (OperandsAre(OperandType.Register))
-                        {
-                            if (op0.Size < 4) throw new ArgumentException(string.Format("IllegalInstruction: Encoding is X86BSwap and Operands is Register, but op0 size is less than 4", op0.Size));
-
-                            _eh.Operand = (uint)OpReg(op0);
-                            AddRexWBySize(op0.Size);
-                            EmitX86OpWithOpReg();
-                        }
+                    case InstructionEncoding.X86BSwap:  //ok
                         break;
-                    case InstructionEncoding.X86BTest:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            Add66HpBySize(op1.Size);
-                            AddRexWBySize(op1.Size);
-
-                            _eh.Operand = (uint)OpReg(op1);
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Register))
-                        {
-                            Add66HpBySize(op1.Size);
-                            AddRexWBySize(op1.Size);
-
-                            _eh.Operand = (uint)OpReg(op1);
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                            break;
-                        }
-
-                        // The remaining instructions use the secondary opcode/r.
-                        _eh.ImmediateValue = op1.As<Immediate>().Int64;
-                        _eh.ImmediateLength = 1;
-
-                        _eh.OpCode = extendedInfo.SecondaryOpCode;
-                        _eh.Operand = ExtractO(_eh.OpCode);
-
-                        Add66HpBySize(op0.Size);
-                        AddRexWBySize(op0.Size);
-
-                        if (OperandsAre(OperandType.Register, OperandType.Immediate))
-                        {
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Immediate))
-                        {
-                            if (op0.Size == 0) throw new ArgumentException();
-
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.X86BTest:  //ok
                         break;
-                    case InstructionEncoding.X86Call:
-                        if (OperandsAre(OperandType.Register))
-                        {
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory))
-                        {
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                            break;
-                        }
-
-                        // The following instructions use the secondary opcode.
-                        _eh.OpCode = extendedInfo.SecondaryOpCode;
-
-                        if (OperandsAre(OperandType.Immediate))
-                        {
-                            _eh.ImmediateValue = op0.As<Immediate>().Int64;
-                            EmitJmpOrCallAbs();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Label))
-                        {
-                            _eh.Label = _assemblerBase.GetLabelData(op0.As<Label>().Id);
-                            if (_eh.Label.Offset != -1)
-                            {
-                                // Bound label.
-                                const int kRel32Size = 5;
-                                var offs = _eh.Label.Offset - Offset;
-
-                                if (offs > 0) throw new ArgumentException();
-                                EmitOp(_eh.OpCode);
-                                EmitDWord(offs - kRel32Size);
-                            }
-                            else
-                            {
-                                // Non-bound label.
-                                EmitOp(_eh.OpCode);
-                                _eh.DisplacementOffset = -4;
-                                _eh.DisplacementSize = 4;
-                                _eh.RelocationId = -1;
-                                EmitDisplacement();
-                            }
-                            EmitDone();
-                        }
+                    case InstructionEncoding.X86Call:   //ok
                         break;
-                    case InstructionEncoding.X86Enter:
-                        if (OperandsAre(OperandType.Immediate, OperandType.Immediate))
-                        {
-                            EmitByte(0xC8);
-                            EmitWord(op1.As<Immediate>().UInt16);
-                            EmitByte(op0.As<Immediate>().UInt8);
-                            EmitDone();
-                        }
+                    case InstructionEncoding.X86Enter:  //ok
                         break;
-                    case InstructionEncoding.X86Imul:
-                        Add66HpBySize(op0.Size);
-                        AddRexWBySize(op0.Size);
-
-                        if (OperandsAre(OperandType.Register))
-                        {
-                            _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
-                            _eh.OpCode |= 0xF6 + (op0.Size != 1).AsUInt();
-
-                            _eh.Operand = 5;
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory))
-                        {
-                            _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
-                            _eh.OpCode |= 0xF6 + (op0.Size != 1).AsUInt();
-
-                            _eh.Operand = 5;
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                            break;
-                        }
-
-                        // The following instructions use 0x0FAF opcode.
-                        _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
-                        _eh.OpCode |= Constants.X86.InstOpCode_MM_0F00 | 0xAF;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            if (op0.Size == 1) throw new ArgumentException();
-
-                            _eh.Operand = (uint)OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            if (op0.Size == 1) throw new ArgumentException();
-
-                            _eh.Operand = (uint)OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitX86(false, true);
-                            break;
-                        }
-
-                        // The following instructions use 0x69/0x6B opcode.
-                        _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
-                        _eh.OpCode |= 0x6B;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Immediate))
-                        {
-                            if (op0.Size == 1) throw new ArgumentException();
-
-                            _eh.ImmediateValue = op1.As<Immediate>().Int64;
-                            _eh.ImmediateLength = 1;
-
-                            if (!_eh.ImmediateValue.IsInt8())
-                            {
-                                _eh.OpCode -= 2;
-                                _eh.ImmediateLength = op0.Size == 2 ? 2 : 4;
-                            }
-
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmRegister = (int)_eh.Operand;
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Immediate))
-                        {
-                            if (op0.Size == 1) throw new ArgumentException();
-
-                            _eh.ImmediateValue = op2.As<Immediate>().Int64;
-                            _eh.ImmediateLength = 1;
-
-                            if (!_eh.ImmediateValue.IsInt8())
-                            {
-                                _eh.OpCode -= 2;
-                                _eh.ImmediateLength = op0.Size == 2 ? 2 : 4;
-                            }
-
-                            _eh.Operand = (uint)OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory, OperandType.Immediate))
-                        {
-                            if (op0.Size == 1) throw new ArgumentException();
-
-                            _eh.ImmediateValue = op2.As<Immediate>().Int64;
-                            _eh.ImmediateLength = 1;
-
-                            if (!_eh.ImmediateValue.IsInt8())
-                            {
-                                _eh.OpCode -= 2;
-                                _eh.ImmediateLength = op0.Size == 2 ? 2 : 4;
-                            }
-
-                            _eh.Operand = (uint)OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.X86Imul:   //ok
                         break;
-                    case InstructionEncoding.X86IncDec:
-                        Add66HpBySize(op0.Size);
-                        AddRexWBySize(op0.Size);
-
-                        if (OperandsAre(OperandType.Register))
-                        {
-                            _eh.ModRmRegister = OpReg(op0);
-
-                            if (!Constants.X64)
-                            {
-                                // INC r16|r32 is not encodable in 64-bit mode.
-                                if ((op0.Size == 2 || op0.Size == 4))
-                                {
-                                    _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
-                                    _eh.OpCode |= extendedInfo.SecondaryOpCode + ((uint)_eh.ModRmRegister & 0x07);
-                                    EmitX86();
-                                    break;
-                                }
-                            }
-
-                            _eh.OpCode += (op0.Size != 1).AsUInt();
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory))
-                        {
-                            _eh.OpCode += (op0.Size != 1).AsUInt();
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.X86IncDec: //ok
                         break;
-                    case InstructionEncoding.X86Int:
-                        if (OperandsAre(OperandType.Immediate))
-                        {
-                            _eh.ImmediateValue = op0.As<Immediate>().Int64;
-                            var imm8 = (byte)(_eh.ImmediateValue & 0xFF);
-
-                            if (imm8 == 0x03) EmitOp(_eh.OpCode);
-                            else
-                            {
-                                EmitOp(_eh.OpCode + 1);
-                                EmitByte(imm8);
-                            }
-                            EmitDone();
-                        }
+                    case InstructionEncoding.X86Int:    //ok
                         break;
-                    case InstructionEncoding.X86Jcc:
-                        if (OperandsAre(OperandType.Label))
-                        {
-                            _eh.Label = _assemblerBase.GetLabelData(op0.As<Label>().Id);
-
-                            if (_assemblerBase.HasFeature(AssemblerFeatures.PredictedJumps))
-                            {
-                                if (_eh.InstructionOptions.IsSet(InstructionOptions.Taken)) EmitByte(0x3E);
-                                if (_eh.InstructionOptions.IsSet(InstructionOptions.NotTaken)) EmitByte(0x2E);
-                            }
-
-                            if (_eh.Label.Offset != -1)
-                            {
-                                // Bound label.
-                                const int kRel8Size = 2;
-                                const int kRel32Size = 6;
-
-                                var offs = _eh.Label.Offset - Offset;
-                                if (offs > 0) throw new ArgumentException();
-
-                                if (!_eh.InstructionOptions.IsSet(InstructionOptions.LongForm) && (offs - kRel8Size).IsInt8())
-                                {
-                                    EmitOp(_eh.OpCode);
-                                    EmitByte((byte)(offs - kRel8Size));
-
-                                    _eh.InstructionOptions |= InstructionOptions.ShortForm;
-                                    EmitDone();
-                                }
-                                else
-                                {
-                                    EmitByte(0x0F);
-                                    EmitOp(_eh.OpCode + 0x10);
-                                    EmitDWord(offs - kRel32Size);
-
-                                    _eh.InstructionOptions &= ~InstructionOptions.ShortForm;
-                                    EmitDone();
-                                }
-                            }
-                            else
-                            {
-                                // Non-bound label.
-                                if (_eh.InstructionOptions.IsSet(InstructionOptions.ShortForm))
-                                {
-                                    EmitOp(_eh.OpCode);
-                                    _eh.DisplacementOffset = -1;
-                                    _eh.DisplacementSize = 1;
-                                    _eh.RelocationId = -1;
-                                    EmitDisplacement();
-                                }
-                                else
-                                {
-                                    EmitByte(0x0F);
-                                    EmitOp(_eh.OpCode + 0x10);
-                                    _eh.DisplacementOffset = -4;
-                                    _eh.DisplacementSize = 4;
-                                    _eh.RelocationId = -1;
-                                    EmitDisplacement();
-                                }
-                            }
-                        }
+                    case InstructionEncoding.X86Jcc:    //ok
                         break;
-                    case InstructionEncoding.X86Jecxz:
-                        if (OperandsAre(OperandType.Register, OperandType.Label))
-                        {
-                            if (OpReg(op0) != 1) throw new ArgumentException();
-
-                            if (Constants.X64) { if (op0.Size == 4) EmitByte(0x67); }
-                            else if (op0.Size == 2) EmitByte(0x67);
-
-                            EmitByte(0xE3);
-                            _eh.Label = _assemblerBase.GetLabelData(op1.As<Label>().Id);
-
-                            if (_eh.Label.Offset != -1)
-                            {
-                                // Bound label.
-                                var offs = _eh.Label.Offset - Offset - 1;
-                                if (!offs.IsInt8()) throw new ArgumentException();
-
-                                EmitByte((byte)offs);
-                                EmitDone();
-                            }
-                            else
-                            {
-                                // Non-bound label.
-                                _eh.DisplacementOffset = -1;
-                                _eh.DisplacementSize = 1;
-                                _eh.RelocationId = -1;
-                                EmitDisplacement();
-                            }
-                        }
+                    case InstructionEncoding.X86Jecxz:  //ok
                         break;
-                    case InstructionEncoding.X86Jmp:
-                        if (OperandsAre(OperandType.Register))
-                        {
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory))
-                        {
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                            break;
-                        }
-
-                        // The following instructions use the secondary opcode (0xE9).
-                        _eh.OpCode = 0xE9;
-
-                        if (OperandsAre(OperandType.Immediate))
-                        {
-                            _eh.ImmediateValue = op0.As<Immediate>().Int64;
-                            EmitJmpOrCallAbs();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Label))
-                        {
-                            _eh.Label = _assemblerBase.GetLabelData(op0.As<Label>().Id);
-                            if (_eh.Label.Offset != Constants.InvalidValue)
-                            {
-                                // Bound label.
-                                const int rel8Size = 2;
-                                const int rel32Size = 5;
-
-                                var offs = _eh.Label.Offset - Offset;
-
-                                if (!_eh.InstructionOptions.IsSet(InstructionOptions.LongForm) && (offs - rel8Size).IsInt8())
-                                {
-                                    _eh.InstructionOptions |= InstructionOptions.ShortForm;
-
-                                    EmitByte(0xEB);
-                                    EmitByte((byte)(offs - rel8Size));
-                                    EmitDone();
-                                    break;
-                                }
-                                _eh.InstructionOptions &= ~InstructionOptions.ShortForm;
-
-                                EmitByte(0xE9);
-                                EmitDWord(offs - rel32Size);
-                                EmitDone();
-                                break;
-                            }
-                            // Non-bound label.
-                            if (_eh.InstructionOptions.IsSet(InstructionOptions.ShortForm))
-                            {
-                                EmitByte(0xEB);
-                                _eh.DisplacementOffset = -1;
-                                _eh.DisplacementSize = 1;
-                                _eh.RelocationId = -1;
-                                EmitDisplacement();
-                            }
-                            else
-                            {
-                                EmitByte(0xE9);
-                                _eh.DisplacementOffset = -4;
-                                _eh.DisplacementSize = 4;
-                                _eh.RelocationId = -1;
-                                EmitDisplacement();
-                            }
-                        }
+                    case InstructionEncoding.X86Jmp:    //ok
                         break;
-                    case InstructionEncoding.X86Lea:
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            Add66HpBySize(op0.Size);
-                            AddRexWBySize(op0.Size);
-
-                            _eh.Operand = (uint)OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.X86Lea:    //ok
                         break;
-                    case InstructionEncoding.X86Mov:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = (uint)OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-
-                            // Asmjit uses segment registers indexed from 1 to 6, leaving zero as
-                            // "no segment register used". We have to fix this (decrement the index
-                            // of the register) when emitting MOV instructions which move to/from
-                            // a segment register. The segment register is always `opReg`, because
-                            // the MOV instruction uses RM or MR encoding.
-
-                            // Sreg <- Reg
-                            if (OpRegType(op0) == RegisterType.Seg)
-                            {
-                                if (!op1.As<Register>().IsGpw() && !op1.As<Register>().IsGpd() && !op1.As<Register>().IsGpq()) throw new ArgumentException();
-
-                                // `opReg` is the segment register.
-                                _eh.Operand--;
-                                _eh.OpCode = 0x8E;
-
-                                Add66HpBySize(op1.Size);
-                                AddRexWBySize(op1.Size);
-                                EmitX86(true);
-                                break;
-                            }
-                            // Reg <- Sreg
-                            if (OpRegType(op1) == RegisterType.Seg)
-                            {
-                                if (!op0.As<Register>().IsGpw() && !op0.As<Register>().IsGpd() && !op0.As<Register>().IsGpq()) throw new ArgumentException();
-
-                                // `opReg` is the segment register.
-                                _eh.Operand = (uint)_eh.ModRmRegister - 1;
-                                _eh.ModRmRegister = OpReg(op0);
-                                _eh.OpCode = 0x8C;
-
-                                Add66HpBySize(op0.Size);
-                                AddRexWBySize(op0.Size);
-                                EmitX86(true);
-                                break;
-                            }
-                            // Reg <- Reg
-                            if (!op0.As<Register>().IsGpb() && !op0.As<Register>().IsGpw() && !op0.As<Register>().IsGpd() && !op0.As<Register>().IsGpq()) throw new ArgumentException();
-
-                            _eh.OpCode = 0x8A + (op0.Size != 1).AsUInt();
-                            Add66HpBySize(op0.Size);
-                            AddRexWBySize(op0.Size);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = (uint)OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-
-                            // Sreg <- Mem
-                            if (OpRegType(op0) == RegisterType.Seg)
-                            {
-                                _eh.OpCode = 0x8E;
-                                _eh.Operand--;
-                                Add66HpBySize(op1.Size);
-                                AddRexWBySize(op1.Size);
-                                EmitX86(false, true);
-                                break;
-                            }
-                            // Reg <- Mem
-                            if (!op0.As<Register>().IsGpb() && !op0.As<Register>().IsGpw() && !op0.As<Register>().IsGpd() && !op0.As<Register>().IsGpq()) throw new ArgumentException();
-                            _eh.OpCode = 0x8A + (op0.Size != 1).AsUInt();
-                            Add66HpBySize(op0.Size);
-                            AddRexWBySize(op0.Size);
-                            EmitX86(false, true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Register))
-                        {
-                            _eh.Operand = (uint)OpReg(op1);
-                            _eh.ModRmMemory = OpMem(op0);
-
-                            // X86Mem <- Sreg
-                            if (OpRegType(op1) == RegisterType.Seg)
-                            {
-                                _eh.OpCode = 0x8C;
-                                Add66HpBySize(op0.Size);
-                                AddRexWBySize(op0.Size);
-                                EmitX86(false, true);
-                                break;
-                            }
-                            // X86Mem <- Reg
-                            if (!op1.As<Register>().IsGpb() && !op1.As<Register>().IsGpw() && !op1.As<Register>().IsGpd() && !op1.As<Register>().IsGpq()) throw new ArgumentException();
-                            _eh.OpCode = 0x88 + (op1.Size != 1).AsUInt();
-                            Add66HpBySize(op1.Size);
-                            AddRexWBySize(op1.Size);
-                            EmitX86(false, true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Immediate))
-                        {
-                            // 64-bit immediate in 64-bit mode is allowed.
-                            _eh.ImmediateValue = op1.As<Immediate>().Int64;
-                            _eh.ImmediateLength = op0.Size;
-
-                            _eh.Operand = 0;
-                            _eh.ModRmRegister = OpReg(op0);
-
-                            if (Constants.X64)
-                            {
-                                // Optimize instruction size by using 32-bit immediate if possible.
-                                if (_eh.ImmediateLength == 8 && _eh.ImmediateValue.IsInt32())
-                                {
-                                    _eh.OpCode = 0xC7;
-                                    AddRexW(1);
-                                    _eh.ImmediateLength = 4;
-                                    EmitX86(true);
-                                    break;
-                                }
-                            }
-                            _eh.OpCode = 0xB0 + ((op0.Size != 1).AsUInt() << 3);
-                            _eh.Operand = (uint)_eh.ModRmRegister;
-
-                            Add66HpBySize(_eh.ImmediateLength);
-                            AddRexWBySize(_eh.ImmediateLength);
-                            EmitX86OpWithOpReg();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Immediate))
-                        {
-                            var memSize = op0.Size;
-
-                            if (memSize == 0) throw new ArgumentException();
-
-                            _eh.ImmediateValue = op1.As<Immediate>().Int64;
-                            _eh.ImmediateLength = Math.Min(memSize, 4);
-
-                            _eh.OpCode = 0xC6 + (memSize != 1).AsUInt();
-                            _eh.Operand = 0;
-                            Add66HpBySize(memSize);
-                            AddRexWBySize(memSize);
-
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.X86Mov:    //ok
                         break;
-                    case InstructionEncoding.X86MovSxZx:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            _eh.OpCode += (op1.Size != 1).AsUInt();
-                            Add66HpBySize(op0.Size);
-                            AddRexWBySize(op0.Size);
-
-                            _eh.Operand = (uint)OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.OpCode += (op1.Size != 1).AsUInt();
-                            Add66HpBySize(op0.Size);
-                            AddRexWBySize(op0.Size);
-
-                            _eh.Operand = (uint)OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.X86MovSxZx:    //ok
                         break;
-                    case InstructionEncoding.X86MovSxd:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            AddRexW(1);
-
-                            _eh.Operand = (uint)OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            AddRexW(1);
-
-                            _eh.Operand = (uint)OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitX86(true);
-                        }
+                    case InstructionEncoding.X86MovSxd: //ok
                         break;
-                    case InstructionEncoding.X86MovPtr:
-                        if (OperandsAre(OperandType.Register, OperandType.Immediate))
-                        {
-                            if (OpReg(op0) != 0) throw new ArgumentException();
-
-                            _eh.OpCode += (op0.Size != 1).AsUInt();
-                            Add66HpBySize(op0.Size);
-                            AddRexWBySize(op0.Size);
-
-                            _eh.ImmediateValue = op1.As<Immediate>().Int64;
-                            _eh.ImmediateLength = Cpu.Info.RegisterSize;
-                            EmitX86();
-                            break;
-                        }
-
-                        // The following instruction uses the secondary opcode.
-                        _eh.OpCode = extendedInfo.SecondaryOpCode;
-
-                        if (OperandsAre(OperandType.Immediate, OperandType.Register))
-                        {
-                            if (OpReg(op1) != 0) throw new ArgumentException();
-
-                            _eh.OpCode += (op1.Size != 1).AsUInt();
-                            Add66HpBySize(op1.Size);
-                            AddRexWBySize(op1.Size);
-
-                            _eh.ImmediateValue = op0.As<Immediate>().Int64;
-                            _eh.ImmediateLength = Cpu.Info.RegisterSize;
-                            EmitX86();
-                        }
+                    case InstructionEncoding.X86MovPtr: //ok
                         break;
                     case InstructionEncoding.X86Push:
-                        if (OperandsAre(OperandType.Register))
+                        //if (OperandsAre(OperandType.Register))    ok
+                        //{
+                        //    if (OpRegType(op0) == RegisterType.Seg)
+                        //    {
+                        //        var segment = OpReg(op0);
+                        //        if (segment >= 7) throw new ArgumentException();
+
+                        //        if (segment >= 5) EmitByte(0x0F);
+
+                        //        EmitByte(_opCodePushSeg[segment]);
+                        //        EmitDone();
+                        //        break;
+                        //    }
+                        //    GroupPop_Gp();
+                        //    break;
+                        //}
+
+                        //if (OperandsAre(OperandType.Immediate))   ok
+                        //{
+                        //    _eh.ImmediateValue = op0.As<Immediate>().Int64;
+                        //    _eh.ImmediateLength = _eh.ImmediateValue.IsInt8() ? 1 : 4;
+
+                        //    EmitByte((byte)(_eh.ImmediateLength == 1 ? 0x6A : 0x68));
+                        //    EmitImm();
+                        //    break;
+                        //}
+                        if (!OperandsAre(OperandType.Register) && !OperandsAre(OperandType.Immediate))
                         {
-                            if (OpRegType(op0) == RegisterType.Seg)
-                            {
-                                var segment = OpReg(op0);
-                                if (segment >= 7) throw new ArgumentException();
-
-                                if (segment >= 5) EmitByte(0x0F);
-
-                                EmitByte(_opCodePushSeg[segment]);
-                                EmitDone();
-                                break;
-                            }
-                            GroupPop_Gp();
-                            break;
+                            encoding = InstructionEncoding.X86Pop;
+                            isContinue = true;
                         }
-
-                        if (OperandsAre(OperandType.Immediate))
-                        {
-                            _eh.ImmediateValue = op0.As<Immediate>().Int64;
-                            _eh.ImmediateLength = _eh.ImmediateValue.IsInt8() ? 1 : 4;
-
-                            EmitByte((byte)(_eh.ImmediateLength == 1 ? 0x6A : 0x68));
-                            EmitImm();
-                            break;
-                        }
-                        encoding = InstructionEncoding.X86Pop;
-                        isContinue = true;
                         break;
-                    case InstructionEncoding.X86Pop:
-                        if (OperandsAre(OperandType.Register))
-                        {
-                            if (OpRegType(op0) == RegisterType.Seg)
-                            {
-                                var segment = OpReg(op0);
-                                if (segment >= 7) throw new ArgumentException();
-
-                                if (segment >= 5) EmitByte(0x0F);
-
-                                EmitByte(_opCodePopSeg[segment]);
-                                EmitDone();
-                                break;
-                            }
-                            GroupPop_Gp();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory))
-                        {
-                            if (op0.Size != 2 && op0.Size != Cpu.Info.RegisterSize) throw new ArgumentException();
-
-                            Add66HpBySize(op0.Size);
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.X86Pop:    //ok
                         break;
                     case InstructionEncoding.X86Rep:
                         // Emit REP 0xF2 or 0xF3 prefix first.
                         EmitByte((byte)(0xF2 + _eh.Operand));
-                        EmitX86();
+                        EmitX86(EmitType.X86Op);
                         break;
-                    case InstructionEncoding.X86Ret:
-                        if (OperandsAre(OperandType.Invalid))
-                        {
-                            EmitByte(0xC3);
-                            EmitDone();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Immediate))
-                        {
-                            _eh.ImmediateValue = op0.As<Immediate>().Int64;
-                            if (_eh.ImmediateValue == 0)
-                            {
-                                EmitByte(0xC3);
-                                EmitDone();
-                            }
-                            else
-                            {
-                                EmitByte(0xC2);
-                                _eh.ImmediateLength = 2;
-                                EmitImm();
-                            }
-                        }
+                    case InstructionEncoding.X86Ret:    //ok
                         break;
-                    case InstructionEncoding.X86Rot:
-                        _eh.OpCode += (op0.Size != 1).AsUInt();
-                        Add66HpBySize(op0.Size);
-                        AddRexWBySize(op0.Size);
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            if (OpRegType(op1) != RegisterType.GpbLo || OpReg(op1) != 1) throw new ArgumentException();
-                            _eh.OpCode += 2;
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Register))
-                        {
-                            if (OpRegType(op1) != RegisterType.GpbLo || OpReg(op1) != 1) throw new ArgumentException();
-                            _eh.OpCode += 2;
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Immediate))
-                        {
-                            _eh.ImmediateValue = op1.As<Immediate>().Int64 & 0xFF;
-                            _eh.ImmediateLength = (_eh.ImmediateValue != 1).AsInt();
-                            if (_eh.ImmediateLength != 0) _eh.OpCode -= 0x10;
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Immediate))
-                        {
-                            if (op0.Size == 0) throw new ArgumentException();
-
-                            _eh.ImmediateValue = op1.As<Immediate>().Int64 & 0xFF;
-                            _eh.ImmediateLength = (_eh.ImmediateValue != 1).AsInt();
-                            if (_eh.ImmediateLength != 0) _eh.OpCode -= 0x10;
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.X86Rot:    //ok
                         break;
-                    case InstructionEncoding.X86Set:
-                        if (OperandsAre(OperandType.Register))
-                        {
-                            if (op0.Size != 1) throw new ArgumentException();
-
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory))
-                        {
-                            if (op0.Size != 1) throw new ArgumentException();
-
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.X86Set:    //ok
                         break;
-                    case InstructionEncoding.X86Shlrd:
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Immediate))
-                        {
-                            if (op0.Size != op1.Size) throw new ArgumentException();
-
-                            Add66HpBySize(op0.Size);
-                            AddRexWBySize(op0.Size);
-
-                            _eh.ImmediateValue = op2.As<Immediate>().Int64;
-                            _eh.ImmediateLength = 1;
-
-                            _eh.Operand = OpReg(op1);
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Register, OperandType.Immediate))
-                        {
-                            Add66HpBySize(op1.Size);
-                            AddRexWBySize(op1.Size);
-
-                            _eh.ImmediateValue = op2.As<Immediate>().Int64;
-                            _eh.ImmediateLength = 1;
-
-                            _eh.Operand = (uint)OpReg(op1);
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                            break;
-                        }
-
-                        // The following instructions use opCode + 1.
-                        _eh.OpCode++;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register))
-                        {
-                            if (OpRegType(op2) != RegisterType.GpbLo || OpReg(op2) != 1) throw new ArgumentException();
-                            if (op0.Size != op1.Size) throw new ArgumentException();
-
-                            Add66HpBySize(op0.Size);
-                            AddRexWBySize(op0.Size);
-
-                            _eh.Operand = (uint)OpReg(op1);
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Register, OperandType.Register))
-                        {
-                            if (OpRegType(op2) != RegisterType.GpbLo || OpReg(op2) != 1) throw new ArgumentException();
-
-                            Add66HpBySize(op1.Size);
-                            AddRexWBySize(op1.Size);
-
-                            _eh.Operand = (uint)OpReg(op1);
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.X86Shlrd:  //ok
                         break;
 
-                    case InstructionEncoding.X86Test:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            if (op0.Size != op1.Size) throw new ArgumentException();
-
-                            _eh.OpCode += (op0.Size != 1).AsUInt();
-                            Add66HpBySize(op0.Size);
-                            AddRexWBySize(op0.Size);
-
-                            _eh.Operand = (uint)OpReg(op1);
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Register))
-                        {
-                            _eh.OpCode += (op1.Size != 1).AsUInt();
-                            Add66HpBySize(op1.Size);
-                            AddRexWBySize(op1.Size);
-
-                            _eh.Operand = (uint)OpReg(op1);
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                            break;
-                        }
-
-                        // The following instructions use the secondary opcode.
-                        _eh.OpCode = extendedInfo.SecondaryOpCode + (op0.Size != 1).AsUInt();
-                        _eh.Operand = ExtractO(_eh.OpCode);
-
-                        if (OperandsAre(OperandType.Register, OperandType.Immediate))
-                        {
-                            _eh.ImmediateValue = op1.As<Immediate>().Int64;
-                            _eh.ImmediateLength = Math.Min(op0.Size, 4);
-
-                            Add66HpBySize(op0.Size);
-                            AddRexWBySize(op0.Size);
-
-                            // Alternate Form - AL, AX, EAX, RAX.
-                            if (OpReg(op0) == 0)
-                            {
-                                _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
-                                _eh.OpCode |= 0xA8 + (op0.Size != 1).AsUInt();
-                                EmitX86();
-                                break;
-                            }
-
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Immediate))
-                        {
-                            if (op0.Size == 0) throw new ArgumentException();
-
-                            _eh.ImmediateValue = op1.As<Immediate>().Int64;
-                            _eh.ImmediateLength = Math.Min(op0.Size, 4);
-
-                            Add66HpBySize(op0.Size);
-                            AddRexWBySize(op0.Size);
-
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.X86Test:   //ok
                         break;
-                    case InstructionEncoding.X86Xadd:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = (uint)OpReg(op1);
-                            _eh.ModRmRegister = OpReg(op0);
-
-                            Add66HpBySize(op0.Size);
-                            AddRexWBySize(op0.Size);
-
-                            // Special opcode for 'xchg ?ax, reg'.
-                            if (code == Inst.Xchg && op0.Size > 1 && (_eh.Operand == 0 || _eh.ModRmRegister == 0))
-                            {
-                                _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
-                                _eh.OpCode |= 0x90;
-                                // One of `xchg a, b` or `xchg b, a` is AX/EAX/RAX.
-                                _eh.Operand += _eh.ModRmRegister;
-                                EmitX86OpWithOpReg();
-                                break;
-                            }
-
-                            _eh.OpCode += (op0.Size != 1).AsUInt();
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Register))
-                        {
-                            _eh.OpCode += (op1.Size != 1).AsUInt();
-                            Add66HpBySize(op1.Size);
-                            AddRexWBySize(op1.Size);
-
-                            _eh.Operand = (uint)OpReg(op1);
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.X86Xadd:   //ok
                         break;
                     case InstructionEncoding.X86Xchg:
                         if (OperandsAre(OperandType.Register, OperandType.Memory))
@@ -1685,7 +661,7 @@ namespace AsmJit.Common
 
                             _eh.Operand = (uint)OpReg(op0);
                             _eh.ModRmMemory = OpMem(op1);
-                            EmitX86(false, true);
+                            EmitX86(EmitType.X86M);
                         }
                         encoding = InstructionEncoding.X86Xadd;
                         isContinue = true;
@@ -1693,200 +669,34 @@ namespace AsmJit.Common
                     case InstructionEncoding.FpuOp:
                         EmitFpuOp();
                         break;
-                    case InstructionEncoding.FpuArith:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = (uint)OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-
-                            // We switch to the alternative opcode if the first operand is zero.
-                            if (_eh.Operand == 0)
-                            {
-                                EmitFpArith_Reg();
-                                break;
-                            }
-                            if (_eh.ModRmRegister == 0)
-                            {
-                                _eh.ModRmRegister = (int)_eh.Operand;
-                                _eh.OpCode = 0xDC00 + ((_eh.OpCode >> 0) & 0xFF) + (uint)_eh.ModRmRegister;
-                                EmitFpuOp();
-                                break;
-                            }
-                            throw new ArgumentException();
-                            //break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory))
-                        {
-                            // 0xD8/0xDC, depends on the size of the memory operand; opReg has been
-                            // set already.
-                            EmitFpArith_Mem();
-                        }
+                    case InstructionEncoding.FpuArith:  //ok
                         break;
-                    case InstructionEncoding.FpuCom:
-                        if (OperandsAre(OperandType.Invalid))
-                        {
-                            _eh.ModRmRegister = 1;
-                            EmitFpArith_Reg();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register))
-                        {
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitFpArith_Reg();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory))
-                        {
-                            EmitFpArith_Mem();
-                        }
+                    case InstructionEncoding.FpuCom:    //ok
                         break;
-                    case InstructionEncoding.FpuFldFst:
-                        if (OperandsAre(OperandType.Memory))
-                        {
-                            _eh.ModRmMemory = OpMem(op0);
-
-                            if (op0.Size == 4 && extendedInfo.InstructionFlags.IsSet(Constants.X86.InstFlagMem4))
-                            {
-                                EmitX86(false, true);
-                                break;
-                            }
-
-                            if (op0.Size == 8 && extendedInfo.InstructionFlags.IsSet(Constants.X86.InstFlagMem8))
-                            {
-                                _eh.OpCode += 4;
-                                EmitX86(false, true);
-                                break;
-                            }
-
-                            if (op0.Size == 10 && extendedInfo.InstructionFlags.IsSet(Constants.X86.InstFlagMem10))
-                            {
-                                _eh.OpCode = extendedInfo.SecondaryOpCode;
-                                _eh.Operand = ExtractO(_eh.OpCode);
-                                EmitX86(false, true);
-                                break;
-                            }
-                        }
-
-                        if (OperandsAre(OperandType.Register))
-                        {
-                            if (code == Inst.Fld)
-                            {
-                                _eh.OpCode = 0xD9C0 + (uint)OpReg(op0);
-                                EmitFpuOp();
-                                break;
-                            }
-
-                            if (code == Inst.Fst)
-                            {
-                                _eh.OpCode = 0xDDD0 + (uint)OpReg(op0);
-                                EmitFpuOp();
-                                break;
-                            }
-
-                            if (code == Inst.Fstp)
-                            {
-                                _eh.OpCode = 0xDDD8 + (uint)OpReg(op0);
-                                EmitFpuOp();
-                            }
-                        }
+                    case InstructionEncoding.FpuFldFst: //ok
                         break;
-                    case InstructionEncoding.FpuM:
-                        if (OperandsAre(OperandType.Memory))
-                        {
-                            _eh.ModRmMemory = OpMem(op0);
-
-                            if (op0.Size == 2 && extendedInfo.InstructionFlags.IsSet(Constants.X86.InstFlagMem2))
-                            {
-                                _eh.OpCode += 4;
-                                EmitX86(false, true);
-                                break;
-                            }
-
-                            if (op0.Size == 4 && extendedInfo.InstructionFlags.IsSet(Constants.X86.InstFlagMem4))
-                            {
-                                EmitX86(false, true);
-                                break;
-                            }
-
-                            if (op0.Size == 8 && extendedInfo.InstructionFlags.IsSet(Constants.X86.InstFlagMem8))
-                            {
-                                _eh.OpCode = extendedInfo.SecondaryOpCode;
-                                _eh.Operand = ExtractO(_eh.OpCode);
-                                EmitX86(false, true);
-                            }
-                        }
+                    case InstructionEncoding.FpuM:  //ok
                         break;
-                    case InstructionEncoding.FpuR:
-                        if (OperandsAre(OperandType.Register))
-                        {
-                            _eh.OpCode += (uint)OpReg(op0);
-                            EmitFpuOp();
-                        }
+                    case InstructionEncoding.FpuR:  //ok
                         break;
                     case InstructionEncoding.FpuRDef:
-                        if (OperandsAre(OperandType.Invalid))
+                        //if (OperandsAre(OperandType.Invalid)) ok
+                        //{
+                        //    _eh.OpCode += 1;
+                        //    EmitFpuOp();
+                        //    break;
+                        //}
+                        if (!OperandsAre(OperandType.Invalid))
                         {
-                            _eh.OpCode += 1;
-                            EmitFpuOp();
-                            break;
-                        }
-                        encoding = InstructionEncoding.FpuR;
-                        isContinue = true;
-                        break;
-                    case InstructionEncoding.FpuStsw:
-                        if (OperandsAre(OperandType.Register))
-                        {
-                            if (OpReg(op0) != 0) throw new ArgumentException();
-
-                            _eh.OpCode = extendedInfo.SecondaryOpCode;
-                            EmitFpuOp();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory))
-                        {
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
+                            encoding = InstructionEncoding.FpuR;
+                            isContinue = true;
                         }
                         break;
-                    case InstructionEncoding.ExtRm:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.FpuStsw:   //ok
                         break;
-                    case InstructionEncoding.ExtRm_P:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            Add66Hp((byte)((OpRegType(op0) == RegisterType.Xmm).AsInt() | (OpRegType(op1) == RegisterType.Xmm).AsInt()));
-
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            Add66Hp((OpRegType(op0) == RegisterType.Xmm).AsByte());
-
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.ExtRm: //ok
+                        break;
+                    case InstructionEncoding.ExtRm_P:   //ok
                         break;
                     case InstructionEncoding.ExtRm_Q:
                         AddRexW((OpRegType(op0) == RegisterType.Gpq || OpRegType(op1) == RegisterType.Gpq || (op1.IsMemory() && op1.Size == 8)).AsByte());
@@ -1898,192 +708,19 @@ namespace AsmJit.Common
                         encoding = InstructionEncoding.ExtRm_Q;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.ExtRmRi:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitX86(false, true);
-                            break;
-                        }
-
-                        // The following instruction uses the secondary opcode.
-                        _eh.OpCode = extendedInfo.SecondaryOpCode;
-                        _eh.Operand = ExtractO(_eh.OpCode);
-
-                        if (OperandsAre(OperandType.Register, OperandType.Immediate))
-                        {
-                            _eh.ImmediateValue = op1.As<Immediate>().Int64;
-                            _eh.ImmediateLength = 1;
-
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitX86(true);
-                        }
+                    case InstructionEncoding.ExtRmRi:   //ok
                         break;
-                    case InstructionEncoding.ExtRmRi_P:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            Add66Hp((byte)((OpRegType(op0) == RegisterType.Xmm).AsInt() | (OpRegType(op1) == RegisterType.Xmm).AsInt()));
-
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            Add66Hp((OpRegType(op0) == RegisterType.Xmm).AsByte());
-
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitX86(false, true);
-                            break;
-                        }
-
-                        // The following instruction uses the secondary opcode.
-                        _eh.OpCode = extendedInfo.SecondaryOpCode;
-                        _eh.Operand = ExtractO(_eh.OpCode);
-
-                        if (OperandsAre(OperandType.Register, OperandType.Immediate))
-                        {
-                            Add66Hp((OpRegType(op0) == RegisterType.Xmm).AsByte());
-
-                            _eh.ImmediateValue = op1.As<Immediate>().Int64;
-                            _eh.ImmediateLength = 1;
-
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitX86(true);
-                        }
+                    case InstructionEncoding.ExtRmRi_P: //ok
                         break;
-                    case InstructionEncoding.ExtRmi:
-                        _eh.ImmediateValue = op2.As<Immediate>().Int64;
-                        _eh.ImmediateLength = 1;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Immediate))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory, OperandType.Immediate))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.ExtRmi:    //ok
                         break;
-                    case InstructionEncoding.ExtRmi_P:
-                        _eh.ImmediateValue = op2.As<Immediate>().Int64;
-                        _eh.ImmediateLength = 1;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Immediate))
-                        {
-                            Add66Hp((byte)((OpRegType(op0) == RegisterType.Xmm).AsInt() | (OpRegType(op1) == RegisterType.Xmm).AsInt()));
-
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory, OperandType.Immediate))
-                        {
-                            Add66Hp((OpRegType(op0) == RegisterType.Xmm).AsByte());
-
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.ExtRmi_P:  //ok
                         break;
-                    case InstructionEncoding.ExtCrc:
-                        Add66HpBySize(op0.Size);
-                        AddRexWBySize(op0.Size);
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            if (OpRegType(op0) <= RegisterType.Gpd || OpRegType(op0) >= RegisterType.Gpq) throw new ArgumentException();
-
-                            _eh.OpCode += (op0.Size != 1).AsUInt();
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            if (OpRegType(op0) <= RegisterType.Gpd || OpRegType(op0) >= RegisterType.Gpq) throw new ArgumentException();
-
-                            _eh.OpCode += (op0.Size != 1).AsUInt();
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.ExtCrc:    //ok
                         break;
-                    case InstructionEncoding.ExtExtrW:
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Immediate))
-                        {
-                            Add66Hp((OpRegType(op1) == RegisterType.Xmm).AsByte());
-
-                            _eh.ImmediateValue = op2.As<Immediate>().Int64;
-                            _eh.ImmediateLength = 1;
-
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Register, OperandType.Immediate))
-                        {
-                            // Secondary opcode of 'pextrw' instruction (SSE4.1).
-                            _eh.OpCode = extendedInfo.SecondaryOpCode;
-                            Add66Hp((OpRegType(op1) == RegisterType.Xmm).AsByte());
-
-                            _eh.ImmediateValue = op2.As<Immediate>().Int64;
-                            _eh.ImmediateLength = 1;
-
-                            _eh.Operand = OpReg(op1);
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.ExtExtrW:  //ok
                         break;
-                    case InstructionEncoding.ExtExtract:
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Immediate))
-                        {
-                            Add66Hp((OpRegType(op1) == RegisterType.Xmm).AsByte());
-
-                            _eh.ImmediateValue = op2.As<Immediate>().Int64;
-                            _eh.ImmediateLength = 1;
-
-                            _eh.Operand = OpReg(op1);
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Register, OperandType.Immediate))
-                        {
-                            Add66Hp((OpRegType(op1) == RegisterType.Xmm).AsByte());
-
-                            _eh.ImmediateValue = op2.As<Immediate>().Int64;
-                            _eh.ImmediateLength = 1;
-
-                            _eh.Operand = OpReg(op1);
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.ExtExtract:    //ok
                         break;
                     case InstructionEncoding.ExtFence:
 
@@ -2116,695 +753,154 @@ namespace AsmJit.Common
                             (op1.IsRegisterType(RegisterType.Gpd) && (extendedInfo.OperandFlags[1] & Constants.X86.InstOpGd) == 0) ||
                             (op1.IsRegisterType(RegisterType.Gpq) && (extendedInfo.OperandFlags[1] & Constants.X86.InstOpGq) == 0)));
 
-                        // Gp|Mm|Xmm <- Gp|Mm|Xmm
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            AddRexW((OpRegType(op0) == RegisterType.Gpq && (extendedInfo.Encoding != InstructionEncoding.ExtMovNoRexW)).AsByte());
-                            AddRexW((OpRegType(op1) == RegisterType.Gpq && (extendedInfo.Encoding != InstructionEncoding.ExtMovNoRexW)).AsByte());
+                        //// Gp|Mm|Xmm <- Gp|Mm|Xmm
+                        //if (OperandsAre(OperandType.Register, OperandType.Register))  ok
+                        //{
+                        //    AddRexW((OpRegType(op0) == RegisterType.Gpq && (extendedInfo.Encoding != InstructionEncoding.ExtMovNoRexW)).AsByte());
+                        //    AddRexW((OpRegType(op1) == RegisterType.Gpq && (extendedInfo.Encoding != InstructionEncoding.ExtMovNoRexW)).AsByte());
 
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitX86(true);
-                            break;
-                        }
+                        //    _eh.Operand = OpReg(op0);
+                        //    _eh.ModRmRegister = OpReg(op1);
+                        //    EmitX86(EmitType.X86R);
+                        //    break;
+                        //}
 
-                        // Gp|Mm|Xmm <- Mem
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            AddRexW((OpRegType(op0) == RegisterType.Gpq && (extendedInfo.Encoding != InstructionEncoding.ExtMovNoRexW)).AsByte());
+                        //// Gp|Mm|Xmm <- Mem
+                        //if (OperandsAre(OperandType.Register, OperandType.Memory))    ok
+                        //{
+                        //    AddRexW((OpRegType(op0) == RegisterType.Gpq && (extendedInfo.Encoding != InstructionEncoding.ExtMovNoRexW)).AsByte());
 
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitX86(false, true);
-                            break;
-                        }
+                        //    _eh.Operand = OpReg(op0);
+                        //    _eh.ModRmMemory = OpMem(op1);
+                        //    EmitX86(EmitType.X86M);
+                        //    break;
+                        //}
 
-                        // The following instruction uses opCode[1].
-                        _eh.OpCode = extendedInfo.SecondaryOpCode;
+                        //// The following instruction uses opCode[1].
+                        //_eh.OpCode = extendedInfo.SecondaryOpCode;
 
-                        // X86Mem <- Gp|Mm|Xmm
-                        if (OperandsAre(OperandType.Memory, OperandType.Register))
-                        {
-                            AddRexW((OpRegType(op1) == RegisterType.Gpq && (extendedInfo.Encoding != InstructionEncoding.ExtMovNoRexW)).AsByte());
+                        //// X86Mem <- Gp|Mm|Xmm
+                        //if (OperandsAre(OperandType.Memory, OperandType.Register))    ok
+                        //{
+                        //    AddRexW((OpRegType(op1) == RegisterType.Gpq && (extendedInfo.Encoding != InstructionEncoding.ExtMovNoRexW)).AsByte());
 
-                            _eh.Operand = OpReg(op1);
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                        }
+                        //    _eh.Operand = OpReg(op1);
+                        //    _eh.ModRmMemory = OpMem(op0);
+                        //    EmitX86(EmitType.X86M);
+                        //}
                         break;
-                    case InstructionEncoding.ExtMovBe:
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            if (_eh.Operand0.Size == 1) throw new ArgumentException();
-
-                            Add66HpBySize(_eh.Operand0.Size);
-                            AddRexWBySize(_eh.Operand0.Size);
-
-                            _eh.Operand = OpReg(_eh.Operand0);
-                            _eh.ModRmMemory = OpMem(_eh.Operand1);
-                            EmitX86(false, true);
-                            break;
-                        }
-
-                        // The following instruction uses the secondary opcode.
-                        _eh.OpCode = extendedInfo.SecondaryOpCode;
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Register))
-                        {
-                            if (_eh.Operand1.Size == 1) throw new ArgumentException();
-
-                            Add66HpBySize(_eh.Operand1.Size);
-                            AddRexWBySize(_eh.Operand1.Size);
-
-                            _eh.Operand = OpReg(_eh.Operand1);
-                            _eh.ModRmMemory = OpMem(_eh.Operand0);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.ExtMovBe:  //ok
                         break;
-                    case InstructionEncoding.ExtMovD:
-                        EmitMmMovD();
+                    case InstructionEncoding.ExtMovD:   //ok
                         break;
-                    case InstructionEncoding.ExtMovQ:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-
-                            // Mm <- Mm
-                            if (OpRegType(op0) == RegisterType.Mm && OpRegType(op1) == RegisterType.Mm)
-                            {
-                                _eh.OpCode = Constants.X86.InstOpCode_PP_00 | Constants.X86.InstOpCode_MM_0F00 | 0x6F;
-                                EmitX86(true);
-                                break;
-                            }
-
-                            // Xmm <- Xmm
-                            if (OpRegType(op0) == RegisterType.Xmm && OpRegType(op1) == RegisterType.Xmm)
-                            {
-                                _eh.OpCode = Constants.X86.InstOpCode_PP_F3 | Constants.X86.InstOpCode_MM_0F00 | 0x7E;
-                                EmitX86(true);
-                                break;
-                            }
-
-                            // Mm <- Xmm (Movdq2q)
-                            if (OpRegType(op0) == RegisterType.Mm && OpRegType(op1) == RegisterType.Xmm)
-                            {
-                                _eh.OpCode = Constants.X86.InstOpCode_PP_F2 | Constants.X86.InstOpCode_MM_0F00 | 0xD6;
-                                EmitX86(true);
-                                break;
-                            }
-
-                            // Xmm <- Mm (Movq2dq)
-                            if (OpRegType(op0) == RegisterType.Xmm && OpRegType(op1) == RegisterType.Mm)
-                            {
-                                _eh.OpCode = Constants.X86.InstOpCode_PP_F3 | Constants.X86.InstOpCode_MM_0F00 | 0xD6;
-                                EmitX86(true);
-                                break;
-                            }
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-
-                            // Mm <- Mem
-                            if (OpRegType(op0) == RegisterType.Mm)
-                            {
-                                _eh.OpCode = Constants.X86.InstOpCode_PP_00 | Constants.X86.InstOpCode_MM_0F00 | 0x6F;
-                                EmitX86(false, true);
-                                break;
-                            }
-
-                            // Xmm <- Mem
-                            if (OpRegType(op0) == RegisterType.Xmm)
-                            {
-                                _eh.OpCode = Constants.X86.InstOpCode_PP_F3 | Constants.X86.InstOpCode_MM_0F00 | 0x7E;
-                                EmitX86(false, true);
-                                break;
-                            }
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Register))
-                        {
-                            _eh.Operand = OpReg(op1);
-                            _eh.ModRmMemory = OpMem(op0);
-
-                            // X86Mem <- Mm
-                            if (OpRegType(op1) == RegisterType.Mm)
-                            {
-                                _eh.OpCode = Constants.X86.InstOpCode_PP_00 | Constants.X86.InstOpCode_MM_0F00 | 0x7F;
-                                EmitX86(false, true);
-                                break;
-                            }
-
-                            // X86Mem <- Xmm
-                            if (OpRegType(op1) == RegisterType.Xmm)
-                            {
-                                _eh.OpCode = Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_MM_0F00 | 0xD6;
-                                EmitX86(false, true);
-                                break;
-                            }
-                        }
-
-                        if (Constants.X64)
-                        {
-                            // Movq in other case is simply a MOVD instruction promoted to 64-bit.
-                            _eh.OpCode |= Constants.X86.InstOpCode_W;
-                            EmitMmMovD();
-                        }
+                    case InstructionEncoding.ExtMovQ:   //ok
                         break;
-                    case InstructionEncoding.ExtPrefetch:
-                        if (OperandsAre(OperandType.Memory, OperandType.Immediate))
-                        {
-                            _eh.Operand = op1.As<Immediate>().UInt32 & 0x3;
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.ExtPrefetch:   //ok
                         break;
-                    case InstructionEncoding.ExtExtrq:
-                        _eh.Operand = OpReg(op0);
-                        _eh.ModRmRegister = OpReg(op1);
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            EmitX86(true);
-                            break;
-                        }
-
-                        // The following instruction uses the secondary opcode.
-                        _eh.OpCode = extendedInfo.SecondaryOpCode;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Immediate, OperandType.Immediate))
-                        {
-                            _eh.ImmediateValue = op1.As<Immediate>().UInt32 + (op2.As<Immediate>().UInt32 << 8);
-                            _eh.ImmediateLength = 2;
-
-                            _eh.ModRmRegister = (int)ExtractO(_eh.OpCode);
-                            EmitX86(true);
-                        }
+                    case InstructionEncoding.ExtExtrq:  //ok
                         break;
-                    case InstructionEncoding.ExtInsertq:
-                        _eh.Operand = OpReg(op0);
-                        _eh.ModRmRegister = OpReg(op1);
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            EmitX86(true);
-                            break;
-                        }
-
-                        // The following instruction uses the secondary opcode.
-                        _eh.OpCode = extendedInfo.SecondaryOpCode;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Immediate) && op3.OperandType == OperandType.Immediate)
-                        {
-                            _eh.ImmediateValue = op2.As<Immediate>().UInt32 + (op3.As<Immediate>().UInt32 << 8);
-                            _eh.ImmediateLength = 2;
-                            EmitX86(true);
-                        }
+                    case InstructionEncoding.ExtInsertq:    //ok
                         break;
-                    case InstructionEncoding.Amd3dNow:
-                        // Every 3dNow instruction starts with 0x0F0F and the actual opcode is
-                        // stored as 8-bit immediate.
-                        _eh.ImmediateValue = _eh.OpCode & 0xFF;
-                        _eh.ImmediateLength = 1;
-
-                        _eh.OpCode = Constants.X86.InstOpCode_MM_0F00 | 0x0F;
-                        _eh.Operand = OpReg(op0);
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitX86(true);
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitX86(false, true);
-                        }
+                    case InstructionEncoding.Amd3dNow:  //ok
                         break;
                     case InstructionEncoding.AvxOp:
                         EmitAvxOp();
                         break;
-                    case InstructionEncoding.AvxM:
-                        if (OperandsAre(OperandType.Memory))
-                        {
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.AvxM:  //ok
                         break;
-                    case InstructionEncoding.AvxMr:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = OpReg(op1);
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Register))
-                        {
-                            _eh.Operand = OpReg(op1);
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.AvxMr: //ok
                         break;
                     case InstructionEncoding.AvxMr_P:
                         AddVexL((byte)((OpRegType(op0) == RegisterType.Ymm).AsInt() | (OpRegType(op1) == RegisterType.Ymm).AsInt()));
                         encoding = InstructionEncoding.AvxMr;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.AvxMri:
-                        _eh.ImmediateValue = op2.As<Immediate>().Int64;
-                        _eh.ImmediateLength = 1;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Immediate))
-                        {
-                            _eh.Operand = OpReg(op1);
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Register, OperandType.Immediate))
-                        {
-                            _eh.Operand = OpReg(op1);
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.AvxMri:    //ok
                         break;
                     case InstructionEncoding.AvxMri_P:
                         AddVexL((byte)((OpRegType(op0) == RegisterType.Ymm).AsInt() | (OpRegType(op1) == RegisterType.Ymm).AsInt()));
                         encoding = InstructionEncoding.AvxMri;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.AvxRm:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.AvxRm: //ok
                         break;
                     case InstructionEncoding.AvxRm_P:
                         AddVexL((byte)((OpRegType(op0) == RegisterType.Ymm).AsInt() | (OpRegType(op1) == RegisterType.Ymm).AsInt()));
                         encoding = InstructionEncoding.AvxRm;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.AvxRmi:
-                        _eh.ImmediateValue = op2.As<Immediate>().Int64;
-                        _eh.ImmediateLength = 1;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Immediate))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory, OperandType.Immediate))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.AvxRmi:    //ok
                         break;
                     case InstructionEncoding.AvxRmi_P:
                         AddVexL((byte)((OpRegType(op0) == RegisterType.Ymm).AsInt() | (OpRegType(op1) == RegisterType.Ymm).AsInt()));
                         encoding = InstructionEncoding.AvxRmi;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.AvxRvm:
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmRegister = OpReg(op2);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmMemory = OpMem(op2);
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.AvxRvm:    //ok
                         break;
                     case InstructionEncoding.AvxRvm_P:
                         AddVexL((OpRegType(op0) == RegisterType.Ymm || OpRegType(op1) == RegisterType.Ymm).AsByte());
                         encoding = InstructionEncoding.AvxRvm;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.AvxRvmr:
-                        if (op3.OperandType != OperandType.Register) throw new ArgumentException();
-
-                        _eh.ImmediateValue = (long)OpReg(op3) << 4;
-                        _eh.ImmediateLength = 1;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmRegister = OpReg(op2);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmMemory = OpMem(op2);
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.AvxRvmr:   //ok
                         break;
                     case InstructionEncoding.AvxRvmr_P:
                         AddVexL((byte)((OpRegType(op0) == RegisterType.Ymm).AsInt() | (OpRegType(op1) == RegisterType.Ymm).AsInt()));
                         encoding = InstructionEncoding.AvxRvmr;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.AvxRvmi:
-                        if (op3.OperandType != OperandType.Immediate) throw new ArgumentException();
-
-                        _eh.ImmediateValue = op3.As<Immediate>().Int64;
-                        _eh.ImmediateLength = 1;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmRegister = OpReg(op2);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmMemory = OpMem(op2);
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.AvxRvmi:   //ok
                         break;
                     case InstructionEncoding.AvxRvmi_P:
                         AddVexL((byte)((OpRegType(op0) == RegisterType.Ymm).AsInt() | (OpRegType(op1) == RegisterType.Ymm).AsInt()));
                         encoding = InstructionEncoding.AvxRvmi;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.AvxRmv:
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op2));
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op2));
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.AvxRmv:    //ok
                         break;
-                    case InstructionEncoding.AvxRmvi:
-                        if (op3.OperandType != OperandType.Immediate) throw new ArgumentException();
-
-                        _eh.ImmediateValue = op3.As<Immediate>().Int64;
-                        _eh.ImmediateLength = 1;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op2));
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op2));
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.AvxRmvi:   //ok
                         break;
-                    case InstructionEncoding.AvxRmMr:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        AvxRmMr_AfterRegRegCheck();
+                    case InstructionEncoding.AvxRmMr:   //ok
                         break;
                     case InstructionEncoding.AvxRmMr_P:
                         AddVexL((byte)((OpRegType(op0) == RegisterType.Ymm).AsInt() | (OpRegType(op1) == RegisterType.Ymm).AsInt()));
                         encoding = InstructionEncoding.AvxRmMr;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.AvxRvmRmi:
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmRegister = OpReg(op2);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmMemory = OpMem(op2);
-                            EmitAvxMAndSib();
-                            break;
-                        }
-
-                        // The following instructions use the secondary opcode.
-                        _eh.OpCode &= Constants.X86.InstOpCode_L_Mask;
-                        _eh.OpCode |= extendedInfo.SecondaryOpCode;
-
-                        _eh.ImmediateValue = op2.As<Immediate>().Int64;
-                        _eh.ImmediateLength = 1;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Immediate))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory, OperandType.Immediate))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.AvxRvmRmi: //ok
                         break;
                     case InstructionEncoding.AvxRvmRmi_P:
                         AddVexL((byte)((OpRegType(op0) == RegisterType.Ymm).AsInt() | (OpRegType(op1) == RegisterType.Ymm).AsInt()));
                         encoding = InstructionEncoding.AvxRvmRmi;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.AvxRvmMr:
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmRegister = OpReg(op2);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmMemory = OpMem(op2);
-                            EmitAvxMAndSib();
-                            break;
-                        }
-
-                        // The following instructions use the secondary opcode.
-                        _eh.OpCode = extendedInfo.SecondaryOpCode;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = OpReg(op1);
-                            _eh.ModRmRegister = OpReg(op0);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Register))
-                        {
-                            _eh.Operand = OpReg(op1);
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.AvxRvmMr:  //ok
                         break;
-                    case InstructionEncoding.AvxRvmMvr:
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmRegister = OpReg(op2);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmMemory = OpMem(op2);
-                            EmitAvxMAndSib();
-                            break;
-                        }
-
-                        // The following instruction uses the secondary opcode.
-                        _eh.OpCode &= Constants.X86.InstOpCode_L_Mask;
-                        _eh.OpCode |= extendedInfo.SecondaryOpCode;
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op2), OpReg(op1));
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.AvxRvmMvr: //ok
                         break;
                     case InstructionEncoding.AvxRvmMvr_P:
                         AddVexL((byte)((OpRegType(op0) == RegisterType.Ymm).AsInt() | (OpRegType(op1) == RegisterType.Ymm).AsInt()));
                         encoding = InstructionEncoding.AvxRvmMvr;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.AvxRvmVmi:
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmRegister = OpReg(op2);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmMemory = OpMem(op2);
-                            EmitAvxMAndSib();
-                            break;
-                        }
-
-                        // The following instruction uses the secondary opcode.
-                        _eh.OpCode &= Constants.X86.InstOpCode_L_Mask;
-                        _eh.OpCode |= extendedInfo.SecondaryOpCode;
-                        _eh.Operand = ExtractO(_eh.OpCode);
-
-                        _eh.ImmediateValue = op2.As<Immediate>().Int64;
-                        _eh.ImmediateLength = 1;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Immediate))
-                        {
-                            _eh.Operand = RegAndVvvv(_eh.Operand, OpReg(op0));
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory, OperandType.Immediate))
-                        {
-                            _eh.Operand = RegAndVvvv(_eh.Operand, OpReg(op0));
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.AvxRvmVmi: //ok
                         break;
                     case InstructionEncoding.AvxRvmVmi_P:
                         AddVexL((byte)((OpRegType(op0) == RegisterType.Ymm).AsInt() | (OpRegType(op1) == RegisterType.Ymm).AsInt()));
                         encoding = InstructionEncoding.AvxRvmVmi;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.AvxVm:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(_eh.Operand, OpReg(op0));
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = RegAndVvvv(_eh.Operand, OpReg(op0));
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.AvxVm: //ok
                         break;
-                    case InstructionEncoding.AvxVmi:
-                        _eh.ImmediateValue = op3.As<Immediate>().Int64;
-                        _eh.ImmediateLength = 1;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Immediate))
-                        {
-                            _eh.Operand = RegAndVvvv(_eh.Operand, OpReg(op0));
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory, OperandType.Immediate))
-                        {
-                            _eh.Operand = RegAndVvvv(_eh.Operand, OpReg(op0));
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.AvxVmi:    //ok
                         break;
                     case InstructionEncoding.AvxVmi_P:
                         AddVexL((byte)((OpRegType(op0) == RegisterType.Ymm).AsInt() | (OpRegType(op1) == RegisterType.Ymm).AsInt()));
                         encoding = InstructionEncoding.AvxVmi;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.AvxRvrmRvmr:
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register) && op3.IsRegister())
-                        {
-                            _eh.ImmediateValue = OpReg(op3) << 4;
-                            _eh.ImmediateLength = 1;
-
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmRegister = OpReg(op2);
-
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register) && op3.IsMemory())
-                        {
-                            _eh.ImmediateValue = OpReg(op2) << 4;
-                            _eh.ImmediateLength = 1;
-
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmMemory = OpMem(op3);
-
-                            AddVexW(1);
-                            EmitAvxMAndSib();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Memory) && op3.IsRegister())
-                        {
-                            _eh.ImmediateValue = OpReg(op3) << 4;
-                            _eh.ImmediateLength = 1;
-
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmMemory = OpMem(op2);
-
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.AvxRvrmRvmr:   //ok
                         break;
                     case InstructionEncoding.AvxRvrmRvmr_P:
                         AddVexL((byte)((OpRegType(op0) == RegisterType.Ymm).AsInt() | (OpRegType(op1) == RegisterType.Ymm).AsInt()));
@@ -2814,91 +910,13 @@ namespace AsmJit.Common
                     case InstructionEncoding.AvxMovDQ:
                         //FIXME isContinue?
                         break;
-                    case InstructionEncoding.AvxMovSsSd:
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register))
-                        {
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitAvxMAndSib();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Memory, OperandType.Register))
-                        {
-                            _eh.OpCode = extendedInfo.SecondaryOpCode;
-                            _eh.Operand = OpReg(op1);
-                            _eh.ModRmMemory = OpMem(op0);
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.AvxMovSsSd:    //ok
                         break;
-                    case InstructionEncoding.AvxGather:
-                        if (OperandsAre(OperandType.Register, OperandType.Memory, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op2));
-                            _eh.ModRmMemory = OpMem(op1);
-
-                            var vSib = _eh.ModRmMemory.VSib;
-                            if (vSib == Constants.X86.MemVSibGpz) throw new ArgumentException();
-
-                            AddVexL((byte)((OpRegType(op0) == RegisterType.Ymm).AsInt() | (OpRegType(op1) == RegisterType.Ymm).AsInt()));
-                            EmitAvxV();
-                        }
+                    case InstructionEncoding.AvxGather: //ok
                         break;
-                    case InstructionEncoding.AvxGatherEx:
-                        if (OperandsAre(OperandType.Register, OperandType.Memory, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op2));
-                            _eh.ModRmMemory = OpMem(op1);
-
-                            var vSib = _eh.ModRmMemory.VSib;
-                            if (vSib == Constants.X86.MemVSibGpz) throw new ArgumentException();
-
-                            AddVexL((vSib == Constants.X86.MemVSibYmm).AsByte());
-                            EmitAvxV();
-                        }
+                    case InstructionEncoding.AvxGatherEx:   //ok
                         break;
-                    case InstructionEncoding.Fma4:
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register) && op3.IsRegister())
-                        {
-                            _eh.ImmediateValue = OpReg(op3) << 4;
-                            _eh.ImmediateLength = 1;
-
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmRegister = OpReg(op2);
-
-                            EmitAvxR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register) && op3.IsMemory())
-                        {
-                            _eh.ImmediateValue = OpReg(op2) << 4;
-                            _eh.ImmediateLength = 1;
-
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmMemory = OpMem(op3);
-
-                            AddVexW(1);
-                            EmitAvxMAndSib();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Memory) && op3.IsRegister())
-                        {
-                            _eh.ImmediateValue = OpReg(op3) << 4;
-                            _eh.ImmediateLength = 1;
-
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmMemory = OpMem(op2);
-
-                            EmitAvxMAndSib();
-                        }
+                    case InstructionEncoding.Fma4:  //ok
                         break;
                     case InstructionEncoding.Fma4_P:
                         // It's fine to just check the first operand, second is just for sanity.
@@ -2906,193 +924,32 @@ namespace AsmJit.Common
                         encoding = InstructionEncoding.Fma4;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.XopRm:
-                        if (OperandsAre(OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitXopR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitXopMAndSib();
-                        }
+                    case InstructionEncoding.XopRm: //ok
                         break;
                     case InstructionEncoding.XopRm_P:
                         AddVexL((byte)((OpRegType(op0) == RegisterType.Ymm).AsInt() | (OpRegType(op1) == RegisterType.Ymm).AsInt()));
                         encoding = InstructionEncoding.XopRm;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.XopRvmRmv:
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op2));
-                            _eh.ModRmRegister = OpReg(op1);
-
-                            EmitXopR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op2));
-                            _eh.ModRmMemory = OpMem(op1);
-
-                            EmitXopMAndSib();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmMemory = OpMem(op2);
-
-                            AddVexW(1);
-                            EmitXopMAndSib();
-                        }
-
+                    case InstructionEncoding.XopRvmRmv: //ok
                         break;
-                    case InstructionEncoding.XopRvmRmi:
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op2));
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitXopR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op2));
-                            _eh.ModRmMemory = OpMem(op1);
-
-                            EmitXopMAndSib();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmMemory = OpMem(op2);
-
-                            AddVexW(1);
-                            EmitXopR();
-                            break;
-                        }
-
-                        // The following instructions use the secondary opcode.
-                        _eh.OpCode = extendedInfo.SecondaryOpCode;
-
-                        _eh.ImmediateValue = op2.As<Immediate>().Int64;
-                        _eh.ImmediateLength = 1;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Immediate))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmRegister = OpReg(op1);
-                            EmitXopR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Memory, OperandType.Immediate))
-                        {
-                            _eh.Operand = OpReg(op0);
-                            _eh.ModRmMemory = OpMem(op1);
-                            EmitXopMAndSib();
-                        }
+                    case InstructionEncoding.XopRvmRmi: //ok
                         break;
-                    case InstructionEncoding.XopRvmr:
-                        if (op3.OperandType != OperandType.Register) throw new ArgumentException();
-
-                        _eh.ImmediateValue = OpReg(op3) << 4;
-                        _eh.ImmediateLength = 1;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmRegister = OpReg(op2);
-                            EmitXopR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmMemory = OpMem(op2);
-                            EmitXopMAndSib();
-                        }
+                    case InstructionEncoding.XopRvmr:   //ok
                         break;
                     case InstructionEncoding.XopRvmr_P:
                         AddVexL((byte)((OpRegType(op0) == RegisterType.Ymm).AsInt() | (OpRegType(op1) == RegisterType.Ymm).AsInt()));
                         encoding = InstructionEncoding.XopRvmr;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.XopRvmi:
-                        if (op3.OperandType != OperandType.Immediate) throw new ArgumentException();
-
-                        _eh.ImmediateValue = op3.As<Immediate>().Int64;
-                        _eh.ImmediateLength = 1;
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmRegister = OpReg(op2);
-                            EmitXopR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Memory))
-                        {
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmMemory = OpMem(op2);
-                            EmitXopMAndSib();
-                        }
+                    case InstructionEncoding.XopRvmi:   //ok
                         break;
                     case InstructionEncoding.XopRvmi_P:
                         AddVexL((byte)((OpRegType(op0) == RegisterType.Ymm).AsInt() | (OpRegType(op1) == RegisterType.Ymm).AsInt()));
                         encoding = InstructionEncoding.XopRvmi;
                         isContinue = true;
                         break;
-                    case InstructionEncoding.XopRvrmRvmr:
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register) && op3.IsRegister())
-                        {
-                            _eh.ImmediateValue = OpReg(op3) << 4;
-                            _eh.ImmediateLength = 1;
-
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmRegister = OpReg(op2);
-
-                            EmitXopR();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register) && op3.IsMemory())
-                        {
-                            _eh.ImmediateValue = OpReg(op2) << 4;
-                            _eh.ImmediateLength = 1;
-
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmMemory = OpMem(op3);
-
-                            AddVexW(1);
-                            EmitXopMAndSib();
-                            break;
-                        }
-
-                        if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Memory) && op3.IsRegister())
-                        {
-                            _eh.ImmediateValue = OpReg(op3) << 4;
-                            _eh.ImmediateLength = 1;
-
-                            _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
-                            _eh.ModRmMemory = OpMem(op2);
-
-                            EmitXopMAndSib();
-                        }
+                    case InstructionEncoding.XopRvrmRvmr:   //ok
                         break;
                     case InstructionEncoding.XopRvrmRvmr_P:
                         AddVexL((byte)((OpRegType(op0) == RegisterType.Ymm).AsInt() | (OpRegType(op1) == RegisterType.Ymm).AsInt()));
@@ -3103,6 +960,1626 @@ namespace AsmJit.Common
                         throw new ArgumentOutOfRangeException(string.Format("unknown encoding:{0}", encoding));
                 }
             }
+
+            if (OperandsAre(OperandType.Register))
+            {
+                if (encoding == InstructionEncoding.X86Rm ||
+                    encoding == InstructionEncoding.X86Call ||
+                    encoding == InstructionEncoding.X86Jmp ||
+                    encoding == InstructionEncoding.X86Set ||
+                    encoding == InstructionEncoding.X86Imul)
+                {
+                    if (encoding == InstructionEncoding.X86Set && op0.Size != 1) throw new ArgumentException();
+                    if (encoding == InstructionEncoding.X86Imul)
+                    {
+                        Add66HpBySize(op0.Size);
+                        AddRexWBySize(op0.Size);
+
+                        _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
+                        _eh.OpCode |= 0xF6 + (op0.Size != 1).AsUInt();
+
+                        _eh.Operand = 5;
+                    }
+                    else if (encoding == InstructionEncoding.X86Rm)
+                    {
+                        Add66HpBySize(op0.Size);
+                        AddRexWBySize(op0.Size);
+                    }
+
+                    _eh.ModRmRegister = OpReg(op0);
+                    EmitX86(EmitType.X86R);
+                }
+                if (encoding == InstructionEncoding.X86BSwap)
+                {
+                    if (op0.Size < 4) throw new ArgumentException(string.Format("IllegalInstruction: Encoding is X86BSwap and Operands is Register, but op0 size is less than 4", op0.Size));
+
+                    _eh.Operand = (uint)OpReg(op0);
+                    AddRexWBySize(op0.Size);
+                    EmitX86(EmitType.X86OpWithOpReg);
+                }
+                if (encoding == InstructionEncoding.X86IncDec)
+                {
+                    Add66HpBySize(op0.Size);
+                    AddRexWBySize(op0.Size);
+
+                    _eh.ModRmRegister = OpReg(op0);
+
+                    if (!Constants.X64 && (op0.Size == 2 || op0.Size == 4))
+                    {// INC r16|r32 is not encodable in 64-bit mode.
+                        _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
+                        _eh.OpCode |= extendedInfo.SecondaryOpCode + ((uint)_eh.ModRmRegister & 0x07);
+                        EmitX86(EmitType.X86Op);
+                    }
+                    else
+                    {
+                        _eh.OpCode += (op0.Size != 1).AsUInt();
+                        EmitX86(EmitType.X86R);
+                    }
+                }
+                if (encoding == InstructionEncoding.X86Push ||
+                    encoding == InstructionEncoding.X86Pop)
+                {
+                    if (OpRegType(op0) == RegisterType.Seg)
+                    {
+                        var segment = OpReg(op0);
+                        if (segment >= 7) throw new ArgumentException();
+                        if (segment >= 5) EmitByte(0x0F);
+
+                        if (encoding == InstructionEncoding.X86Push) EmitByte(_opCodePushSeg[segment]);
+                        else if (encoding == InstructionEncoding.X86Pop) EmitByte(_opCodePopSeg[segment]);
+                        EmitDone();
+                    }
+                    else GroupPop_Gp();
+                }
+                if (encoding == InstructionEncoding.FpuCom)
+                {
+                    _eh.ModRmRegister = OpReg(op0);
+                    EmitFpArith_Reg();
+                }
+                if (encoding == InstructionEncoding.FpuFldFst)
+                {
+                    if (code == Inst.Fld) _eh.OpCode = 0xD9C0 + (uint)OpReg(op0);
+                    else if (code == Inst.Fst) _eh.OpCode = 0xDDD0 + (uint)OpReg(op0);
+                    else if (code == Inst.Fstp) _eh.OpCode = 0xDDD8 + (uint)OpReg(op0);
+                    EmitFpuOp();
+                }
+                if (encoding == InstructionEncoding.FpuR)
+                {
+                    _eh.OpCode += (uint)OpReg(op0);
+                    EmitFpuOp();
+                }
+                if (encoding == InstructionEncoding.FpuStsw)
+                {
+                    if (OpReg(op0) != 0) throw new ArgumentException();
+
+                    _eh.OpCode = extendedInfo.SecondaryOpCode;
+                    EmitFpuOp();
+                }
+            }
+            else if (OperandsAre(OperandType.Memory))
+            {
+                if (encoding == InstructionEncoding.X86Rm ||
+                    encoding == InstructionEncoding.X86M ||
+                    encoding == InstructionEncoding.X86Call ||
+                    encoding == InstructionEncoding.X86Jmp ||
+                    encoding == InstructionEncoding.FpuStsw ||
+                    encoding == InstructionEncoding.X86Set ||
+                    encoding == InstructionEncoding.X86Imul ||
+                    encoding == InstructionEncoding.X86IncDec ||
+                    encoding == InstructionEncoding.X86Pop ||
+                    encoding == InstructionEncoding.FpuFldFst ||
+                    encoding == InstructionEncoding.FpuM
+                    )
+                {
+                    if (encoding == InstructionEncoding.X86Set && op0.Size != 1) throw new ArgumentException();
+                    else if (encoding == InstructionEncoding.X86Imul)
+                    {
+                        Add66HpBySize(op0.Size);
+                        AddRexWBySize(op0.Size);
+
+                        _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
+                        _eh.OpCode |= 0xF6 + (op0.Size != 1).AsUInt();
+                        _eh.Operand = 5;
+                    }
+                    else if (encoding == InstructionEncoding.X86IncDec)
+                    {
+                        Add66HpBySize(op0.Size);
+                        AddRexWBySize(op0.Size);
+
+                        _eh.OpCode += (op0.Size != 1).AsUInt();
+                    }
+                    else if (encoding == InstructionEncoding.X86Pop)
+                    {
+                        if (op0.Size != 2 && op0.Size != Cpu.Info.RegisterSize) throw new ArgumentException();
+
+                        Add66HpBySize(op0.Size);
+                    }
+                    else if (encoding == InstructionEncoding.FpuFldFst)
+                    {
+                        if (op0.Size == 4 && extendedInfo.InstructionFlags.IsSet(Constants.X86.InstFlagMem4)) { }
+                        else if (op0.Size == 8 && extendedInfo.InstructionFlags.IsSet(Constants.X86.InstFlagMem8)) _eh.OpCode += 4;
+                        else if (op0.Size == 10 && extendedInfo.InstructionFlags.IsSet(Constants.X86.InstFlagMem10))
+                        {
+                            _eh.OpCode = extendedInfo.SecondaryOpCode;
+                            _eh.Operand = ExtractO(_eh.OpCode);
+                        }
+                        else throw new ArgumentException();
+                    }
+                    else if (encoding == InstructionEncoding.FpuM)
+                    {
+                        if (op0.Size == 2 && extendedInfo.InstructionFlags.IsSet(Constants.X86.InstFlagMem2)) _eh.OpCode += 4;
+                        else if (op0.Size == 4 && extendedInfo.InstructionFlags.IsSet(Constants.X86.InstFlagMem4)) { }
+                        else if (op0.Size == 8 && extendedInfo.InstructionFlags.IsSet(Constants.X86.InstFlagMem8))
+                        {
+                            _eh.OpCode = extendedInfo.SecondaryOpCode;
+                            _eh.Operand = ExtractO(_eh.OpCode);
+                        }
+                        else throw new ArgumentException();
+                    }
+                    else if (encoding == InstructionEncoding.X86Rm)
+                    {
+                        Add66HpBySize(op0.Size);
+                        AddRexWBySize(op0.Size);
+                    }
+
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitX86(EmitType.X86M);
+                }
+                if (encoding == InstructionEncoding.FpuArith ||
+                    encoding == InstructionEncoding.FpuCom)
+                {
+                    // FpuArith: 0xD8/0xDC, depends on the size of the memory operand; opReg has been set already.
+                    EmitFpArith_Mem();
+                }
+                if (encoding == InstructionEncoding.AvxM)
+                {
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitAvxXop(EmitType.AvxMAndSib);
+                }
+            }
+            else if (OperandsAre(OperandType.Register, OperandType.Register))
+            {
+                if (encoding == InstructionEncoding.X86Arith ||
+                    encoding == InstructionEncoding.X86Imul ||
+                    encoding == InstructionEncoding.X86RegRm ||
+                    encoding == InstructionEncoding.X86Mov ||
+                    encoding == InstructionEncoding.X86MovSxZx ||
+                    encoding == InstructionEncoding.X86MovSxd)
+                {
+                    if (encoding == InstructionEncoding.X86Arith) _eh.OpCode += (op0.Size != 1).AsUInt() + 2;
+                    else if (encoding == InstructionEncoding.X86MovSxZx) _eh.OpCode += (op1.Size != 1).AsUInt();
+                    else if (encoding == InstructionEncoding.X86Imul)
+                    {
+                        Add66HpBySize(op0.Size);
+                        AddRexWBySize(op0.Size);
+                        _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
+                        _eh.OpCode |= Constants.X86.InstOpCode_MM_0F00 | 0xAF;
+
+                        if (op0.Size == 1) throw new ArgumentException();
+                    }
+                    else if (encoding == InstructionEncoding.X86RegRm && (op0.Size == 1 || op0.Size != op1.Size)) throw new ArgumentException(string.Format("IllegalInstruction: Operands are Register & Register, but size is 1 or both are different sizes(op0 size:{0}, op1 size:{1})", op0.Size, op1.Size));
+                    else if (encoding == InstructionEncoding.X86MovSxd) AddRexW(1);
+
+                    if (encoding == InstructionEncoding.X86Arith ||
+                        encoding == InstructionEncoding.X86RegRm ||
+                        encoding == InstructionEncoding.X86MovSxZx)
+                    {
+                        Add66HpBySize(op0.Size);
+                        AddRexWBySize(op0.Size);
+                    }
+
+                    _eh.Operand = (uint)OpReg(op0);
+                    _eh.ModRmRegister = OpReg(op1);
+
+                    if (encoding == InstructionEncoding.X86Mov)
+                    {
+                        // Asmjit uses segment registers indexed from 1 to 6, leaving zero as
+                        // "no segment register used". We have to fix this (decrement the index
+                        // of the register) when emitting MOV instructions which move to/from
+                        // a segment register. The segment register is always `opReg`, because
+                        // the MOV instruction uses RM or MR encoding.
+
+                        // Sreg <- Reg
+                        if (OpRegType(op0) == RegisterType.Seg)
+                        {
+                            if (!op1.As<Register>().IsGpw() && !op1.As<Register>().IsGpd() && !op1.As<Register>().IsGpq()) throw new ArgumentException();
+
+                            // `opReg` is the segment register.
+                            _eh.Operand--;
+                            _eh.OpCode = 0x8E;
+
+                            Add66HpBySize(op1.Size);
+                            AddRexWBySize(op1.Size);
+                        }
+                        // Reg <- Sreg
+                        else if (OpRegType(op1) == RegisterType.Seg)
+                        {
+                            if (!op0.As<Register>().IsGpw() && !op0.As<Register>().IsGpd() && !op0.As<Register>().IsGpq()) throw new ArgumentException();
+
+                            // `opReg` is the segment register.
+                            _eh.Operand = (uint)_eh.ModRmRegister - 1;
+                            _eh.ModRmRegister = OpReg(op0);
+                            _eh.OpCode = 0x8C;
+
+                            Add66HpBySize(op0.Size);
+                            AddRexWBySize(op0.Size);
+                        }
+                        // Reg <- Reg
+                        else if (op0.As<Register>().IsGpb() || op0.As<Register>().IsGpw() || op0.As<Register>().IsGpd() || op0.As<Register>().IsGpq())
+                        {
+                            _eh.OpCode = 0x8A + (op0.Size != 1).AsUInt();
+                            Add66HpBySize(op0.Size);
+                            AddRexWBySize(op0.Size);
+                        }
+                        else throw new ArgumentException();
+                    }
+                    EmitX86(EmitType.X86R);
+                }
+                if (encoding == InstructionEncoding.X86Rot)
+                {
+                    _eh.OpCode += (op0.Size != 1).AsUInt();
+                    Add66HpBySize(op0.Size);
+                    AddRexWBySize(op0.Size);
+
+                    if (OpRegType(op1) != RegisterType.GpbLo || OpReg(op1) != 1) throw new ArgumentException();
+                    _eh.OpCode += 2;
+                    _eh.ModRmRegister = OpReg(op0);
+                    EmitX86(EmitType.X86R);
+                }
+                if (encoding == InstructionEncoding.X86RmReg ||
+                    encoding == InstructionEncoding.X86BTest ||
+                    encoding == InstructionEncoding.X86Test)
+                {
+                    if (encoding == InstructionEncoding.X86RmReg || encoding == InstructionEncoding.X86Test)
+                    {
+                        if (encoding == InstructionEncoding.X86Test && op0.Size != op1.Size) throw new ArgumentException();
+
+                        _eh.OpCode += (op0.Size != 1).AsUInt();
+                        Add66HpBySize(op0.Size);
+                        AddRexWBySize(op0.Size);
+                    }
+                    else if (encoding == InstructionEncoding.X86BTest)
+                    {
+                        Add66HpBySize(op1.Size);
+                        AddRexWBySize(op1.Size);
+                    }
+
+                    _eh.Operand = (uint)OpReg(op1);
+                    _eh.ModRmRegister = OpReg(op0);
+                    EmitX86(EmitType.X86R);
+                }
+                if (encoding == InstructionEncoding.X86Xadd)
+                {
+                    _eh.Operand = (uint)OpReg(op1);
+                    _eh.ModRmRegister = OpReg(op0);
+
+                    Add66HpBySize(op0.Size);
+                    AddRexWBySize(op0.Size);
+
+                    // Special opcode for 'xchg ?ax, reg'.
+                    if (code == Inst.Xchg && op0.Size > 1 && (_eh.Operand == 0 || _eh.ModRmRegister == 0))
+                    {
+                        _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
+                        _eh.OpCode |= 0x90;
+                        // One of `xchg a, b` or `xchg b, a` is AX/EAX/RAX.
+                        _eh.Operand += _eh.ModRmRegister;
+                        EmitX86(EmitType.X86OpWithOpReg);
+                        //break;
+                    }
+                    else
+                    {
+                        _eh.OpCode += (op0.Size != 1).AsUInt();
+                        EmitX86(EmitType.X86R);
+                    }
+                }
+                if (encoding == InstructionEncoding.FpuArith)
+                {
+                    _eh.Operand = (uint)OpReg(op0);
+                    _eh.ModRmRegister = OpReg(op1);
+
+                    // We switch to the alternative opcode if the first operand is zero.
+                    if (_eh.Operand == 0) EmitFpArith_Reg();
+                    else if (_eh.ModRmRegister == 0)
+                    {
+                        _eh.ModRmRegister = (int)_eh.Operand;
+                        _eh.OpCode = 0xDC00 + ((_eh.OpCode >> 0) & 0xFF) + (uint)_eh.ModRmRegister;
+                        EmitFpuOp();
+                    }
+                    else throw new ArgumentException();
+                }
+                if (encoding == InstructionEncoding.ExtRm ||
+                    encoding == InstructionEncoding.ExtRmRi ||
+                    encoding == InstructionEncoding.ExtRmRi_P ||
+                    encoding == InstructionEncoding.ExtRm_P ||
+                    encoding == InstructionEncoding.ExtCrc ||
+                    encoding == InstructionEncoding.ExtMov ||
+                    encoding == InstructionEncoding.ExtMovNoRexW ||
+                    encoding == InstructionEncoding.ExtMovD ||
+                    encoding == InstructionEncoding.ExtMovQ ||
+                    encoding == InstructionEncoding.ExtExtrq ||
+                    encoding == InstructionEncoding.ExtInsertq ||
+                    encoding == InstructionEncoding.Amd3dNow)
+                {
+                    bool isExtMovD_OP0Gp = false;
+                    if (encoding == InstructionEncoding.ExtRm_P || encoding == InstructionEncoding.ExtRmRi_P)
+                        Add66Hp((byte)((OpRegType(op0) == RegisterType.Xmm).AsInt() | (OpRegType(op1) == RegisterType.Xmm).AsInt()));
+                    else if (encoding == InstructionEncoding.ExtCrc)
+                    {
+                        Add66HpBySize(op0.Size);
+                        AddRexWBySize(op0.Size);
+                        if (OpRegType(op0) <= RegisterType.Gpd || OpRegType(op0) >= RegisterType.Gpq) throw new ArgumentException();
+                        _eh.OpCode += (op0.Size != 1).AsUInt();
+                    }
+                    else if (encoding == InstructionEncoding.ExtMov || encoding == InstructionEncoding.ExtMovNoRexW)
+                    { // Gp|Mm|Xmm <- Gp|Mm|Xmm
+                        AddRexW((OpRegType(op0) == RegisterType.Gpq && (extendedInfo.Encoding != InstructionEncoding.ExtMovNoRexW)).AsByte());
+                        AddRexW((OpRegType(op1) == RegisterType.Gpq && (extendedInfo.Encoding != InstructionEncoding.ExtMovNoRexW)).AsByte());
+                    }
+                    else if (encoding == InstructionEncoding.ExtMovD || encoding == InstructionEncoding.ExtMovQ)
+                    {
+                        // Mm <- Mm
+                        if (encoding == InstructionEncoding.ExtMovQ && OpRegType(op0) == RegisterType.Mm && OpRegType(op1) == RegisterType.Mm)
+                            _eh.OpCode = Constants.X86.InstOpCode_PP_00 | Constants.X86.InstOpCode_MM_0F00 | 0x6F;
+                        // Xmm <- Xmm
+                        else if (encoding == InstructionEncoding.ExtMovQ && OpRegType(op0) == RegisterType.Xmm && OpRegType(op1) == RegisterType.Xmm)
+                            _eh.OpCode = Constants.X86.InstOpCode_PP_F3 | Constants.X86.InstOpCode_MM_0F00 | 0x7E;
+                        // Mm <- Xmm (Movdq2q)
+                        else if (encoding == InstructionEncoding.ExtMovQ && OpRegType(op0) == RegisterType.Mm && OpRegType(op1) == RegisterType.Xmm)
+                            _eh.OpCode = Constants.X86.InstOpCode_PP_F2 | Constants.X86.InstOpCode_MM_0F00 | 0xD6;
+                        // Xmm <- Mm (Movq2dq)
+                        else if (encoding == InstructionEncoding.ExtMovQ && OpRegType(op0) == RegisterType.Xmm && OpRegType(op1) == RegisterType.Mm)
+                            _eh.OpCode = Constants.X86.InstOpCode_PP_F3 | Constants.X86.InstOpCode_MM_0F00 | 0xD6;
+                        // Mm/Xmm <- Gp //EmitMmMovD();
+                        else if ((encoding == InstructionEncoding.ExtMovD || Constants.X64) && op1.As<Register>().IsGp())
+                        { //Movq in other case is simply a MOVD instruction promoted to 64-bit.
+                            if (encoding == InstructionEncoding.ExtMovQ) _eh.OpCode |= Constants.X86.InstOpCode_W;
+                            Add66Hp((OpRegType(op0) == RegisterType.Xmm).AsByte());
+                        }
+                        // Gp <- Mm/Xmm //EmitMmMovD();
+                        else if ((encoding == InstructionEncoding.ExtMovD || Constants.X64) && op0.As<Register>().IsGp())
+                        { //Movq in other case is simply a MOVD instruction promoted to 64-bit.
+                            isExtMovD_OP0Gp = true;
+                            _eh.OpCode = _eh.SecondaryOpCode;
+                            Add66Hp((OpRegType(op1) == RegisterType.Xmm).AsByte());
+                            _eh.Operand = OpReg(op1);
+                            _eh.ModRmRegister = OpReg(op0);
+                        }
+                        else throw new ArgumentException();
+                    }
+                    else if (encoding == InstructionEncoding.Amd3dNow)
+                    {
+                        // Every 3dNow instruction starts with 0x0F0F and the actual opcode is stored as 8-bit immediate.
+                        _eh.ImmediateValue = _eh.OpCode & 0xFF;
+                        _eh.ImmediateLength = 1;
+
+                        _eh.OpCode = Constants.X86.InstOpCode_MM_0F00 | 0x0F;
+                    }
+                    if (!isExtMovD_OP0Gp)
+                    {
+                        _eh.Operand = OpReg(op0);
+                        _eh.ModRmRegister = OpReg(op1);
+                    }
+                    EmitX86(EmitType.X86R);
+                }
+                if (encoding == InstructionEncoding.AvxRm ||
+                    encoding == InstructionEncoding.AvxRmMr)
+                {
+                    _eh.Operand = OpReg(op0);
+                    _eh.ModRmRegister = OpReg(op1);
+                    EmitAvxXop(EmitType.AvxR);
+                }
+                if (encoding == InstructionEncoding.AvxMr ||
+                    encoding == InstructionEncoding.AvxRvmMr)
+                {
+                    if (encoding == InstructionEncoding.AvxRvmMr) _eh.OpCode = extendedInfo.SecondaryOpCode;
+                    _eh.Operand = OpReg(op1);
+                    _eh.ModRmRegister = OpReg(op0);
+                    EmitAvxXop(EmitType.AvxR);
+                }
+                if (encoding == InstructionEncoding.AvxVm)
+                {
+                    _eh.Operand = RegAndVvvv(_eh.Operand, OpReg(op0));
+                    _eh.ModRmRegister = OpReg(op1);
+                    EmitAvxXop(EmitType.AvxR);
+                }
+                if (encoding == InstructionEncoding.XopRm)
+                {
+                    _eh.Operand = OpReg(op0);
+                    _eh.ModRmRegister = OpReg(op1);
+                    EmitAvxXop(EmitType.XopR);//EmitXopR();
+                }
+            }
+            else if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Register))
+            {
+                if (encoding == InstructionEncoding.X86Shlrd)
+                {
+                    _eh.OpCode++;
+
+                    if (OpRegType(op2) != RegisterType.GpbLo || OpReg(op2) != 1) throw new ArgumentException();
+                    if (op0.Size != op1.Size) throw new ArgumentException();
+
+                    Add66HpBySize(op0.Size);
+                    AddRexWBySize(op0.Size);
+
+                    _eh.Operand = (uint)OpReg(op1);
+                    _eh.ModRmRegister = OpReg(op0);
+                    EmitX86(EmitType.X86R);
+                }
+                if (encoding == InstructionEncoding.AvxRvm ||
+                    encoding == InstructionEncoding.AvxRvmr ||
+                    encoding == InstructionEncoding.AvxRvmi ||
+                    encoding == InstructionEncoding.AvxRvmRmi ||
+                    encoding == InstructionEncoding.AvxRvmMr ||
+                    encoding == InstructionEncoding.AvxRvmMvr ||
+                    encoding == InstructionEncoding.AvxRvmVmi)
+                {
+                    if (encoding == InstructionEncoding.AvxRvmr)
+                    {
+                        if (op3.OperandType != OperandType.Register) throw new ArgumentException();
+
+                        _eh.ImmediateValue = (long)OpReg(op3) << 4;
+                        _eh.ImmediateLength = 1;
+                    }
+                    else if (encoding == InstructionEncoding.AvxRvmi)
+                    {
+                        if (op3.OperandType != OperandType.Immediate) throw new ArgumentException();
+
+                        _eh.ImmediateValue = op3.As<Immediate>().Int64;
+                        _eh.ImmediateLength = 1;
+                    }
+                    _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
+                    _eh.ModRmRegister = OpReg(op2);
+                    EmitAvxXop(EmitType.AvxR);
+                }
+                if (encoding == InstructionEncoding.AvxRmv ||
+                    encoding == InstructionEncoding.AvxRmvi)
+                {
+                    if (encoding == InstructionEncoding.AvxRmvi)
+                    {
+                        if (op3.OperandType != OperandType.Immediate) throw new ArgumentException();
+
+                        _eh.ImmediateValue = op3.As<Immediate>().Int64;
+                        _eh.ImmediateLength = 1;
+                    }
+                    _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op2));
+                    _eh.ModRmRegister = OpReg(op1);
+                    EmitAvxXop(EmitType.AvxR);
+                }
+                if (encoding == InstructionEncoding.AvxRvrmRvmr ||
+                    encoding == InstructionEncoding.Fma4)
+                {
+                    if (op3.IsRegister())
+                    {
+                        _eh.ImmediateValue = OpReg(op3) << 4;
+                        _eh.ImmediateLength = 1;
+
+                        _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
+                        _eh.ModRmRegister = OpReg(op2);
+
+                        EmitAvxXop(EmitType.AvxR);
+                    }
+                    else if (op3.IsMemory())
+                    {
+                        _eh.ImmediateValue = OpReg(op2) << 4;
+                        _eh.ImmediateLength = 1;
+
+                        _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
+                        _eh.ModRmMemory = OpMem(op3);
+
+                        AddVexW(1);
+                        EmitAvxXop(EmitType.AvxMAndSib);
+                    }
+                }
+                if (encoding == InstructionEncoding.AvxMovSsSd) EmitAvxXop(EmitType.AvxR);
+                if (encoding == InstructionEncoding.XopRvmRmv ||
+                    encoding == InstructionEncoding.XopRvmRmi)
+                {
+                    _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op2));
+                    _eh.ModRmRegister = OpReg(op1);
+                    EmitAvxXop(EmitType.XopR);//EmitXopR();
+                }
+                if (encoding == InstructionEncoding.XopRvmr ||
+                    encoding == InstructionEncoding.XopRvmi)
+                {
+                    if (encoding == InstructionEncoding.XopRvmr)
+                    {
+                        if (op3.OperandType != OperandType.Register) throw new ArgumentException();
+
+                        _eh.ImmediateValue = OpReg(op3) << 4;
+                        _eh.ImmediateLength = 1;
+                    }
+                    if (encoding == InstructionEncoding.XopRvmi)
+                    {
+                        if (op3.OperandType != OperandType.Immediate) throw new ArgumentException();
+
+                        _eh.ImmediateValue = op3.As<Immediate>().Int64;
+                        _eh.ImmediateLength = 1;
+                    }
+                    _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
+                    _eh.ModRmRegister = OpReg(op2);
+                    EmitAvxXop(EmitType.XopR);//EmitXopR();
+                }
+                if (encoding == InstructionEncoding.XopRvrmRvmr)
+                {
+                    if (op3.IsRegister())
+                    {
+                        _eh.ImmediateValue = OpReg(op3) << 4;
+                        _eh.ImmediateLength = 1;
+
+                        _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
+                        _eh.ModRmRegister = OpReg(op2);
+
+                        EmitAvxXop(EmitType.XopR);//EmitXopR();
+                    }
+                    else if (op3.IsMemory())
+                    {
+                        _eh.ImmediateValue = OpReg(op2) << 4;
+                        _eh.ImmediateLength = 1;
+
+                        _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
+                        _eh.ModRmMemory = OpMem(op3);
+
+                        AddVexW(1);
+                        EmitAvxXop(EmitType.XopMAndSib);
+                    }
+                }
+            }
+            else if (OperandsAre(OperandType.Register, OperandType.Memory, OperandType.Register))
+            {
+                if (encoding == InstructionEncoding.AvxRmv ||
+                    encoding == InstructionEncoding.AvxRmvi ||
+                    encoding == InstructionEncoding.AvxGather ||
+                    encoding == InstructionEncoding.AvxGatherEx ||
+                    encoding == InstructionEncoding.XopRvmRmv ||
+                    encoding == InstructionEncoding.XopRvmRmi)
+                {
+                    _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op2));
+                    _eh.ModRmMemory = OpMem(op1);
+                    if (encoding == InstructionEncoding.AvxRmvi)
+                    {
+                        if (op3.OperandType != OperandType.Immediate) throw new ArgumentException();
+
+                        _eh.ImmediateValue = op3.As<Immediate>().Int64;
+                        _eh.ImmediateLength = 1;
+                    }
+                    if (encoding == InstructionEncoding.AvxRmv || encoding == InstructionEncoding.AvxRmvi) EmitAvxXop(EmitType.AvxMAndSib);
+                    else if (encoding == InstructionEncoding.AvxGather || encoding == InstructionEncoding.AvxGatherEx)
+                    {
+                        var vSib = _eh.ModRmMemory.VSib;
+                        if (vSib == Constants.X86.MemVSibGpz) throw new ArgumentException();
+
+                        if (encoding == InstructionEncoding.AvxGather) AddVexL((byte)((OpRegType(op0) == RegisterType.Ymm).AsInt() | (OpRegType(op1) == RegisterType.Ymm).AsInt()));
+                        if (encoding == InstructionEncoding.AvxGatherEx) AddVexL((vSib == Constants.X86.MemVSibYmm).AsByte());
+                        EmitAvxV();
+                    }
+                    else if (encoding == InstructionEncoding.XopRvmRmv || encoding == InstructionEncoding.XopRvmRmi) EmitAvxXop(EmitType.XopMAndSib);
+                }
+            }
+            else if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Memory))
+            {
+                if (encoding == InstructionEncoding.AvxRvm ||
+                    encoding == InstructionEncoding.AvxRvmr ||
+                    encoding == InstructionEncoding.AvxRvmi ||
+                    encoding == InstructionEncoding.AvxRvmRmi ||
+                    encoding == InstructionEncoding.AvxRvmMr ||
+                    encoding == InstructionEncoding.AvxRvmMvr ||
+                    encoding == InstructionEncoding.AvxRvmVmi)
+                {
+                    if (encoding == InstructionEncoding.AvxRvmr)
+                    {
+                        if (op3.OperandType != OperandType.Register) throw new ArgumentException();
+
+                        _eh.ImmediateValue = (long)OpReg(op3) << 4;
+                        _eh.ImmediateLength = 1;
+                    }
+                    else if (encoding == InstructionEncoding.AvxRvmi)
+                    {
+                        if (op3.OperandType != OperandType.Immediate) throw new ArgumentException();
+
+                        _eh.ImmediateValue = op3.As<Immediate>().Int64;
+                        _eh.ImmediateLength = 1;
+                    }
+                    _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
+                    _eh.ModRmMemory = OpMem(op2);
+                    EmitAvxXop(EmitType.AvxMAndSib);
+                }
+                if (encoding == InstructionEncoding.AvxRvrmRvmr && op3.IsRegister())
+                {
+                    _eh.ImmediateValue = OpReg(op3) << 4;
+                    _eh.ImmediateLength = 1;
+
+                    _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
+                    _eh.ModRmMemory = OpMem(op2);
+
+                    EmitAvxXop(EmitType.AvxMAndSib);
+                }
+                if (encoding == InstructionEncoding.XopRvmRmv)
+                {
+                    _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
+                    _eh.ModRmMemory = OpMem(op2);
+
+                    AddVexW(1);
+                    EmitAvxXop(EmitType.XopMAndSib);
+                }
+                if (encoding == InstructionEncoding.XopRvmRmi)
+                {
+                    _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
+                    _eh.ModRmMemory = OpMem(op2);
+
+                    AddVexW(1);
+                    EmitAvxXop(EmitType.XopR);//EmitXopR();
+                }
+                if (encoding == InstructionEncoding.XopRvmr ||
+                    encoding == InstructionEncoding.XopRvmi)
+                {
+                    if (encoding == InstructionEncoding.XopRvmr)
+                    {
+                        if (op3.OperandType != OperandType.Register) throw new ArgumentException();
+
+                        _eh.ImmediateValue = OpReg(op3) << 4;
+                        _eh.ImmediateLength = 1;
+                    }
+                    if (encoding == InstructionEncoding.XopRvmi)
+                    {
+                        if (op3.OperandType != OperandType.Immediate) throw new ArgumentException();
+
+                        _eh.ImmediateValue = op3.As<Immediate>().Int64;
+                        _eh.ImmediateLength = 1;
+                    }
+                    _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
+                    _eh.ModRmMemory = OpMem(op2);
+                    EmitAvxXop(EmitType.XopMAndSib);
+                }
+                if (encoding == InstructionEncoding.XopRvrmRvmr && op3.IsRegister())
+                {
+                    _eh.ImmediateValue = OpReg(op3) << 4;
+                    _eh.ImmediateLength = 1;
+
+                    _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
+                    _eh.ModRmMemory = OpMem(op2);
+
+                    EmitAvxXop(EmitType.XopMAndSib);
+                }
+                if (encoding == InstructionEncoding.Fma4 && op3.IsRegister())
+                {
+                    _eh.ImmediateValue = OpReg(op3) << 4;
+                    _eh.ImmediateLength = 1;
+
+                    _eh.Operand = RegAndVvvv(OpReg(op0), OpReg(op1));
+                    _eh.ModRmMemory = OpMem(op2);
+
+                    EmitAvxXop(EmitType.AvxMAndSib);
+                }
+            }
+            else if (OperandsAre(OperandType.Memory, OperandType.Register, OperandType.Register))
+            {
+                if (encoding == InstructionEncoding.X86Shlrd)
+                {
+                    _eh.OpCode++;
+
+                    if (OpRegType(op2) != RegisterType.GpbLo || OpReg(op2) != 1) throw new ArgumentException();
+
+                    Add66HpBySize(op1.Size);
+                    AddRexWBySize(op1.Size);
+
+                    _eh.Operand = (uint)OpReg(op1);
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitX86(EmitType.X86M);
+                }
+                if (encoding == InstructionEncoding.AvxRvmMvr)
+                {
+                    _eh.OpCode &= Constants.X86.InstOpCode_L_Mask;
+                    _eh.OpCode |= extendedInfo.SecondaryOpCode;
+
+                    _eh.Operand = RegAndVvvv(OpReg(op2), OpReg(op1));
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitAvxXop(EmitType.AvxMAndSib);
+                }
+            }
+            else if (OperandsAre(OperandType.Memory, OperandType.Register))
+            {
+                if (encoding == InstructionEncoding.X86BTest)
+                {
+                    Add66HpBySize(op1.Size);
+                    AddRexWBySize(op1.Size);
+
+                    _eh.Operand = (uint)OpReg(op1);
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitX86(EmitType.X86M);
+                }
+                if (encoding == InstructionEncoding.X86RmReg ||
+                    encoding == InstructionEncoding.X86Arith ||
+                    encoding == InstructionEncoding.X86Test ||
+                    encoding == InstructionEncoding.X86Xadd)
+                {
+                    _eh.OpCode += (op1.Size != 1).AsUInt();
+                    Add66HpBySize(op1.Size);
+                    AddRexWBySize(op1.Size);
+
+                    _eh.Operand = (uint)OpReg(op1);
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitX86(EmitType.X86M);
+                }
+                if (encoding == InstructionEncoding.X86Mov)
+                {
+                    // X86Mem <- Sreg
+                    if (OpRegType(op1) == RegisterType.Seg)
+                    {
+                        _eh.OpCode = 0x8C;
+                        Add66HpBySize(op0.Size);
+                        AddRexWBySize(op0.Size);
+                    }
+                    // X86Mem <- Reg
+                    else if (op1.As<Register>().IsGpb() || op1.As<Register>().IsGpw() || op1.As<Register>().IsGpd() || op1.As<Register>().IsGpq())
+                    {
+                        _eh.OpCode = 0x88 + (op1.Size != 1).AsUInt();
+                        Add66HpBySize(op1.Size);
+                        AddRexWBySize(op1.Size);
+                    }
+                    else throw new ArgumentException();
+
+                    _eh.Operand = (uint)OpReg(op1);
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitX86(EmitType.X86M);
+                }
+                if (encoding == InstructionEncoding.X86Rot)
+                {
+                    _eh.OpCode += (op0.Size != 1).AsUInt();
+                    Add66HpBySize(op0.Size);
+                    AddRexWBySize(op0.Size);
+
+                    if (OpRegType(op1) != RegisterType.GpbLo || OpReg(op1) != 1) throw new ArgumentException();
+                    _eh.OpCode += 2;
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitX86(EmitType.X86M);
+                }
+                if (encoding == InstructionEncoding.ExtMov || encoding == InstructionEncoding.ExtMovNoRexW)
+                { // X86Mem <- Gp|Mm|Xmm
+                    _eh.OpCode = extendedInfo.SecondaryOpCode;
+
+                    AddRexW((OpRegType(op1) == RegisterType.Gpq && (extendedInfo.Encoding != InstructionEncoding.ExtMovNoRexW)).AsByte());
+
+                    _eh.Operand = OpReg(op1);
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitX86(EmitType.X86M);
+                }
+                if (encoding == InstructionEncoding.ExtMovBe)
+                {
+                    _eh.OpCode = extendedInfo.SecondaryOpCode;
+
+                    if (op1.Size == 1) throw new ArgumentException();
+
+                    Add66HpBySize(op1.Size);
+                    AddRexWBySize(op1.Size);
+
+                    _eh.Operand = OpReg(op1);
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitX86(EmitType.X86M);
+                }
+                if (encoding == InstructionEncoding.ExtMovD || encoding == InstructionEncoding.ExtMovQ)
+                {
+                    // X86Mem <- Mm
+                    if (encoding == InstructionEncoding.ExtMovQ && OpRegType(op1) == RegisterType.Mm)
+                        _eh.OpCode = Constants.X86.InstOpCode_PP_00 | Constants.X86.InstOpCode_MM_0F00 | 0x7F;
+                    // X86Mem <- Xmm
+                    else if (encoding == InstructionEncoding.ExtMovQ && OpRegType(op1) == RegisterType.Xmm)
+                        _eh.OpCode = Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_MM_0F00 | 0xD6;
+                    // X86Mem <- Mm/Xmm //EmitMmMovD();
+                    else if (encoding == InstructionEncoding.ExtMovD || Constants.X64)
+                    { // Movq in other case is simply a MOVD instruction promoted to 64-bit.
+                        _eh.OpCode = _eh.SecondaryOpCode;
+                        Add66Hp((OpRegType(op1) == RegisterType.Xmm).AsByte());
+                    }
+                    else throw new ArgumentException();
+
+                    _eh.Operand = OpReg(op1);
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitX86(EmitType.X86M);
+                }
+                if (encoding == InstructionEncoding.AvxMr)
+                {
+                    _eh.Operand = OpReg(op1);
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitAvxXop(EmitType.AvxMAndSib);
+                }
+                if (encoding == InstructionEncoding.AvxRmMr)
+                {
+                    _eh.OpCode &= Constants.X86.InstOpCode_L_Mask;
+                    _eh.OpCode |= _eh.SecondaryOpCode;
+
+                    _eh.Operand = OpReg(op1);
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitAvxXop(EmitType.AvxMAndSib);
+                }
+                if (encoding == InstructionEncoding.AvxRvmMr)
+                {
+                    _eh.OpCode = extendedInfo.SecondaryOpCode;
+
+                    _eh.Operand = OpReg(op1);
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitAvxXop(EmitType.AvxMAndSib);
+                }
+                if (encoding == InstructionEncoding.AvxMovSsSd)
+                {
+                    _eh.OpCode = extendedInfo.SecondaryOpCode;
+                    _eh.Operand = OpReg(op1);
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitAvxXop(EmitType.AvxMAndSib);
+                }
+            }
+            else if (OperandsAre(OperandType.Register, OperandType.Memory))
+            {
+                if (encoding == InstructionEncoding.X86RegRm ||
+                    encoding == InstructionEncoding.X86Arith ||
+                    encoding == InstructionEncoding.X86Imul ||
+                    encoding == InstructionEncoding.X86Lea ||
+                    encoding == InstructionEncoding.X86Mov ||
+                    encoding == InstructionEncoding.X86MovSxZx)
+                {
+                    if (encoding == InstructionEncoding.X86RegRm ||
+                        encoding == InstructionEncoding.X86Arith ||
+                        encoding == InstructionEncoding.X86Imul ||
+                        encoding == InstructionEncoding.X86Lea ||
+                        encoding == InstructionEncoding.X86MovSxZx)
+                    {
+                        if (encoding == InstructionEncoding.X86Arith) _eh.OpCode += (op0.Size != 1).AsUInt() + 2;
+                        if (encoding == InstructionEncoding.X86MovSxZx) _eh.OpCode += (op1.Size != 1).AsUInt();
+                        Add66HpBySize(op0.Size);
+                        AddRexWBySize(op0.Size);
+                        if (encoding == InstructionEncoding.X86Imul)
+                        {
+                            _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
+                            _eh.OpCode |= Constants.X86.InstOpCode_MM_0F00 | 0xAF;
+                        }
+                        if (encoding == InstructionEncoding.X86RegRm ||
+                            encoding == InstructionEncoding.X86Imul)
+                        {
+                            if (op0.Size == 1) throw new ArgumentException();
+                        }
+                    }
+                    _eh.Operand = (uint)OpReg(op0);
+                    _eh.ModRmMemory = OpMem(op1);
+
+                    if (encoding == InstructionEncoding.X86Mov)
+                    {
+                        // Sreg <- Mem
+                        if (OpRegType(op0) == RegisterType.Seg)
+                        {
+                            _eh.OpCode = 0x8E;
+                            _eh.Operand--;
+                            Add66HpBySize(op1.Size);
+                            AddRexWBySize(op1.Size);
+                        }
+                        // Reg <- Mem
+                        else if (op0.As<Register>().IsGpb() || op0.As<Register>().IsGpw() || op0.As<Register>().IsGpd() || op0.As<Register>().IsGpq())
+                        {
+                            _eh.OpCode = 0x8A + (op0.Size != 1).AsUInt();
+                            Add66HpBySize(op0.Size);
+                            AddRexWBySize(op0.Size);
+                        }
+                        else throw new ArgumentException();
+                    }
+
+                    EmitX86(EmitType.X86M);
+                }
+                if (encoding == InstructionEncoding.X86MovSxd)
+                {
+                    AddRexW(1);
+
+                    _eh.Operand = (uint)OpReg(op0);
+                    _eh.ModRmMemory = OpMem(op1);
+                    EmitX86(EmitType.X86R);
+                }
+                if (encoding == InstructionEncoding.ExtRm ||
+                    encoding == InstructionEncoding.ExtRm_P ||
+                    encoding == InstructionEncoding.ExtRmRi ||
+                    encoding == InstructionEncoding.ExtRmRi_P ||
+                    encoding == InstructionEncoding.ExtCrc ||
+                    encoding == InstructionEncoding.ExtMov ||
+                    encoding == InstructionEncoding.ExtMovNoRexW ||
+                    encoding == InstructionEncoding.ExtMovBe ||
+                    encoding == InstructionEncoding.ExtMovD ||
+                    encoding == InstructionEncoding.ExtMovQ ||
+                    encoding == InstructionEncoding.Amd3dNow)
+                {
+                    if (encoding == InstructionEncoding.ExtRm_P ||
+                        encoding == InstructionEncoding.ExtRmRi_P)
+                    {
+                        Add66Hp((OpRegType(op0) == RegisterType.Xmm).AsByte());
+                    }
+                    else if (encoding == InstructionEncoding.ExtCrc)
+                    {
+                        Add66HpBySize(op0.Size);
+                        AddRexWBySize(op0.Size);
+                        if (OpRegType(op0) <= RegisterType.Gpd || OpRegType(op0) >= RegisterType.Gpq) throw new ArgumentException();
+                        _eh.OpCode += (op0.Size != 1).AsUInt();
+                    }
+                    else if (encoding == InstructionEncoding.ExtMov || encoding == InstructionEncoding.ExtMovNoRexW)
+                    { // Gp|Mm|Xmm <- Mem
+                        AddRexW((OpRegType(op0) == RegisterType.Gpq && (extendedInfo.Encoding != InstructionEncoding.ExtMovNoRexW)).AsByte());
+                    }
+                    else if (encoding == InstructionEncoding.ExtMovBe)
+                    {
+                        if (op0.Size == 1) throw new ArgumentException();
+
+                        Add66HpBySize(op0.Size);
+                        AddRexWBySize(op0.Size);
+                    }
+                    else if (encoding == InstructionEncoding.ExtMovD || encoding == InstructionEncoding.ExtMovQ)
+                    {
+                        // Mm <- Mem
+                        if (encoding == InstructionEncoding.ExtMovQ && OpRegType(op0) == RegisterType.Mm)
+                            _eh.OpCode = Constants.X86.InstOpCode_PP_00 | Constants.X86.InstOpCode_MM_0F00 | 0x6F;
+                        // Xmm <- Mem
+                        else if (encoding == InstructionEncoding.ExtMovQ && OpRegType(op0) == RegisterType.Xmm)
+                            _eh.OpCode = Constants.X86.InstOpCode_PP_F3 | Constants.X86.InstOpCode_MM_0F00 | 0x7E;
+                        // Mm/Xmm <- Mem //EmitMmMovD();
+                        else if (encoding == InstructionEncoding.ExtMovD || Constants.X64)
+                        { // Movq in other case is simply a MOVD instruction promoted to 64-bit.
+                            if (encoding == InstructionEncoding.ExtMovQ) _eh.OpCode |= Constants.X86.InstOpCode_W;
+                            Add66Hp((OpRegType(op0) == RegisterType.Xmm).AsByte());
+                        }
+                        else throw new ArgumentException();
+                    }
+                    else if (encoding == InstructionEncoding.Amd3dNow)
+                    {
+                        // Every 3dNow instruction starts with 0x0F0F and the actual opcode is
+                        // stored as 8-bit immediate.
+                        _eh.ImmediateValue = _eh.OpCode & 0xFF;
+                        _eh.ImmediateLength = 1;
+
+                        _eh.OpCode = Constants.X86.InstOpCode_MM_0F00 | 0x0F;
+                    }
+
+                    _eh.Operand = OpReg(op0);
+                    _eh.ModRmMemory = OpMem(op1);
+                    EmitX86(EmitType.X86M);
+                }
+                if (encoding == InstructionEncoding.AvxRm ||
+                    encoding == InstructionEncoding.AvxRmMr ||
+                    encoding == InstructionEncoding.AvxVm ||
+                    encoding == InstructionEncoding.AvxMovSsSd)
+                {
+                    if (encoding == InstructionEncoding.AvxVm) _eh.Operand = RegAndVvvv(_eh.Operand, OpReg(op0));
+                    else _eh.Operand = OpReg(op0);
+
+                    _eh.ModRmMemory = OpMem(op1);
+                    EmitAvxXop(EmitType.AvxMAndSib);
+                }
+                if (encoding == InstructionEncoding.XopRm)
+                {
+                    _eh.Operand = OpReg(op0);
+                    _eh.ModRmMemory = OpMem(op1);
+                    EmitAvxXop(EmitType.XopMAndSib);
+                }
+            }
+            else if (OperandsAre(OperandType.Register, OperandType.Register, OperandType.Immediate))
+            {
+                if (encoding != InstructionEncoding.ExtInsertq && encoding != InstructionEncoding.AvxVmi)
+                { //X86Imul、X86Shlrd、ExtRmi、ExtRmi_P、ExtExtrW、ExtExtract、AvxMri、AvxRmi、AvxRvmRmi、AvxRvmVmi、XopRvmRmi
+                    _eh.ImmediateValue = op2.As<Immediate>().Int64;
+                    _eh.ImmediateLength = 1;
+                }
+                if (encoding == InstructionEncoding.X86Imul)
+                {
+                    _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
+                    _eh.OpCode |= 0x6B;
+
+                    if (op0.Size == 1) throw new ArgumentException();
+
+                    if (!_eh.ImmediateValue.IsInt8())
+                    {
+                        _eh.OpCode -= 2;
+                        _eh.ImmediateLength = op0.Size == 2 ? 2 : 4;
+                    }
+
+                    _eh.Operand = (uint)OpReg(op0);
+                    _eh.ModRmRegister = OpReg(op1);
+                    EmitX86(EmitType.X86R);
+                }
+                if (encoding == InstructionEncoding.ExtRmi ||
+                    encoding == InstructionEncoding.ExtRmi_P ||
+                    encoding == InstructionEncoding.ExtExtrW)
+                {
+                    if (encoding == InstructionEncoding.ExtRmi_P) Add66Hp((byte)((OpRegType(op0) == RegisterType.Xmm).AsInt() | (OpRegType(op1) == RegisterType.Xmm).AsInt()));
+                    else if (encoding == InstructionEncoding.ExtExtrW) Add66Hp((OpRegType(op1) == RegisterType.Xmm).AsByte());
+
+                    _eh.Operand = OpReg(op0);
+                    _eh.ModRmRegister = OpReg(op1);
+                    EmitX86(EmitType.X86R);
+                }
+                if (encoding == InstructionEncoding.X86Shlrd ||
+                    encoding == InstructionEncoding.ExtExtract)
+                {
+                    if (encoding == InstructionEncoding.X86Shlrd)
+                    {
+                        if (op0.Size != op1.Size) throw new ArgumentException();
+
+                        Add66HpBySize(op0.Size);
+                        AddRexWBySize(op0.Size);
+                    }
+                    else if (encoding == InstructionEncoding.ExtExtract) Add66Hp((OpRegType(op1) == RegisterType.Xmm).AsByte());
+
+                    _eh.Operand = OpReg(op1);
+                    _eh.ModRmRegister = OpReg(op0);
+                    EmitX86(EmitType.X86R);
+                }
+                if (encoding == InstructionEncoding.ExtInsertq && op3.OperandType == OperandType.Immediate)
+                {
+                    _eh.Operand = OpReg(op0);
+                    _eh.ModRmRegister = OpReg(op1);
+                    _eh.OpCode = extendedInfo.SecondaryOpCode;
+
+                    _eh.ImmediateValue = op2.As<Immediate>().UInt32 + (op3.As<Immediate>().UInt32 << 8);
+                    _eh.ImmediateLength = 2;
+                    EmitX86(EmitType.X86R);
+                }
+                if (encoding == InstructionEncoding.AvxRmi ||
+                    encoding == InstructionEncoding.AvxRvmRmi)
+                {
+                    if (encoding == InstructionEncoding.AvxRvmRmi)
+                    {
+                        _eh.OpCode &= Constants.X86.InstOpCode_L_Mask;
+                        _eh.OpCode |= extendedInfo.SecondaryOpCode;
+                    }
+
+                    _eh.Operand = OpReg(op0);
+                    _eh.ModRmRegister = OpReg(op1);
+                    EmitAvxXop(EmitType.AvxR);
+                }
+                if (encoding == InstructionEncoding.AvxRvmVmi)
+                {
+                    _eh.OpCode &= Constants.X86.InstOpCode_L_Mask;
+                    _eh.OpCode |= extendedInfo.SecondaryOpCode;
+                    _eh.Operand = ExtractO(_eh.OpCode);
+
+                    _eh.Operand = RegAndVvvv(_eh.Operand, OpReg(op0));
+                    _eh.ModRmRegister = OpReg(op1);
+                    EmitAvxXop(EmitType.AvxR);
+                }
+                if (encoding == InstructionEncoding.AvxMri)
+                {
+                    _eh.Operand = OpReg(op1);
+                    _eh.ModRmRegister = OpReg(op0);
+                    EmitAvxXop(EmitType.AvxR);
+                }
+                if (encoding == InstructionEncoding.AvxVmi)
+                {
+                    _eh.ImmediateValue = op3.As<Immediate>().Int64;
+                    _eh.ImmediateLength = 1;
+
+                    _eh.Operand = RegAndVvvv(_eh.Operand, OpReg(op0));
+                    _eh.ModRmRegister = OpReg(op1);
+                    EmitAvxXop(EmitType.AvxR);
+                }
+                if (encoding == InstructionEncoding.XopRvmRmi)
+                {
+                    _eh.OpCode = extendedInfo.SecondaryOpCode;
+
+                    _eh.Operand = OpReg(op0);
+                    _eh.ModRmRegister = OpReg(op1);
+                    EmitAvxXop(EmitType.XopR);//EmitXopR();
+                }
+            }
+            else if (OperandsAre(OperandType.Register, OperandType.Memory, OperandType.Immediate))
+            {
+                if (encoding != InstructionEncoding.AvxVmi)
+                { //X86Imul、ExtRmi、ExtRmi_P、AvxRmi、AvxRvmRmi、AvxRvmVmi、XopRvmRmi
+                    _eh.ImmediateValue = op2.As<Immediate>().Int64;
+                    _eh.ImmediateLength = 1;
+                }
+                if (encoding == InstructionEncoding.X86Imul ||
+                    encoding == InstructionEncoding.ExtRmi ||
+                    encoding == InstructionEncoding.ExtRmi_P)
+                {
+                    if (encoding == InstructionEncoding.X86Imul)
+                    {
+                        _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
+                        _eh.OpCode |= 0x6B;
+
+                        if (op0.Size == 1) throw new ArgumentException();
+
+                        if (!_eh.ImmediateValue.IsInt8())
+                        {
+                            _eh.OpCode -= 2;
+                            _eh.ImmediateLength = op0.Size == 2 ? 2 : 4;
+                        }
+                    }
+                    else if (encoding == InstructionEncoding.ExtRmi_P) Add66Hp((OpRegType(op0) == RegisterType.Xmm).AsByte());
+
+                    if (encoding == InstructionEncoding.X86Imul) _eh.Operand = (uint)OpReg(op0);
+                    else _eh.Operand = OpReg(op0);
+
+                    _eh.ModRmMemory = OpMem(op1);
+                    EmitX86(EmitType.X86M);
+                }
+                if (encoding == InstructionEncoding.AvxRmi ||
+                    encoding == InstructionEncoding.AvxRvmRmi ||
+                    encoding == InstructionEncoding.AvxRvmVmi ||
+                    encoding == InstructionEncoding.AvxVmi)
+                {
+                    if (encoding == InstructionEncoding.AvxRvmRmi ||
+                        encoding == InstructionEncoding.AvxRvmVmi)
+                    {
+                        _eh.OpCode &= Constants.X86.InstOpCode_L_Mask;
+                        _eh.OpCode |= extendedInfo.SecondaryOpCode;
+                    }
+                    if (encoding == InstructionEncoding.AvxRmi ||
+                        encoding == InstructionEncoding.AvxRvmRmi) _eh.Operand = OpReg(op0);
+                    if (encoding == InstructionEncoding.AvxRvmVmi)
+                    {
+                        _eh.Operand = ExtractO(_eh.OpCode);
+                        _eh.Operand = RegAndVvvv(_eh.Operand, OpReg(op0));
+                    }
+                    if (encoding == InstructionEncoding.AvxVmi)
+                    {
+                        _eh.ImmediateValue = op3.As<Immediate>().Int64;
+                        _eh.ImmediateLength = 1;
+                        _eh.Operand = RegAndVvvv(_eh.Operand, OpReg(op0));
+                    }
+                    _eh.ModRmMemory = OpMem(op1);
+                    EmitAvxXop(EmitType.AvxMAndSib);
+                }
+                if (encoding == InstructionEncoding.XopRvmRmi)
+                {
+                    _eh.OpCode = extendedInfo.SecondaryOpCode;
+                    _eh.Operand = OpReg(op0);
+                    _eh.ModRmMemory = OpMem(op1);
+                    EmitAvxXop(EmitType.XopMAndSib);
+                }
+            }
+            else if (OperandsAre(OperandType.Memory, OperandType.Register, OperandType.Immediate))
+            {
+                _eh.ImmediateValue = op2.As<Immediate>().Int64;
+                _eh.ImmediateLength = 1;
+                if (encoding == InstructionEncoding.X86Shlrd ||
+                    encoding == InstructionEncoding.ExtExtrW ||
+                    encoding == InstructionEncoding.ExtExtract)
+                {
+                    if (encoding == InstructionEncoding.X86Shlrd)
+                    {
+                        Add66HpBySize(op1.Size);
+                        AddRexWBySize(op1.Size);
+                    }
+                    if (encoding == InstructionEncoding.ExtExtrW) _eh.OpCode = extendedInfo.SecondaryOpCode; // Secondary opcode of 'pextrw' instruction (SSE4.1).
+                    if (encoding == InstructionEncoding.ExtExtrW || 
+                        encoding == InstructionEncoding.ExtExtract) Add66Hp((OpRegType(op1) == RegisterType.Xmm).AsByte());
+
+                    if (encoding == InstructionEncoding.X86Shlrd) _eh.Operand = (uint)OpReg(op1);
+                    else _eh.Operand = OpReg(op1);
+
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitX86(EmitType.X86M);
+                }
+                if (encoding == InstructionEncoding.AvxMri)
+                {
+                    _eh.Operand = OpReg(op1);
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitAvxXop(EmitType.AvxMAndSib);
+                }
+            }
+            else if (OperandsAre(OperandType.Register, OperandType.Immediate, OperandType.Immediate))
+            {
+                if (encoding == InstructionEncoding.ExtExtrq)
+                {
+                    _eh.Operand = OpReg(op0);
+                    _eh.OpCode = extendedInfo.SecondaryOpCode;
+
+                    _eh.ImmediateValue = op1.As<Immediate>().UInt32 + (op2.As<Immediate>().UInt32 << 8);
+                    _eh.ImmediateLength = 2;
+
+                    _eh.ModRmRegister = (int)ExtractO(_eh.OpCode);
+                    EmitX86(EmitType.X86R);
+                }
+            }
+            else if (OperandsAre(OperandType.Register, OperandType.Immediate))
+            {
+                if (encoding == InstructionEncoding.X86Arith)
+                {
+                    _eh.OpCode = 0x80;
+                    _eh.ImmediateValue = op1.As<Immediate>().Int64;
+                    _eh.ImmediateLength = _eh.ImmediateValue.IsInt8() ? 1 : Math.Min(op0.Size, 4);
+                    _eh.ModRmRegister = OpReg(op0);
+
+                    Add66HpBySize(op0.Size);
+                    AddRexWBySize(op0.Size);
+
+                    // Alternate Form - AL, AX, EAX, RAX.
+                    if (_eh.ModRmRegister == 0 && (op0.Size == 1 || _eh.ImmediateLength != 1))
+                    {
+                        _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
+                        _eh.OpCode |= (_eh.Operand << 3) | (0x04 + (op0.Size != 1).AsUInt());
+                        _eh.ImmediateLength = Math.Min(op0.Size, 4);
+                        EmitX86(EmitType.X86Op);
+                        //break;
+                    }
+                    else
+                    {
+                        _eh.OpCode += (uint)(op0.Size != 1 ? (_eh.ImmediateLength != 1 ? 1 : 3) : 0);
+                        EmitX86(EmitType.X86R);
+                    }
+                }
+                if (encoding == InstructionEncoding.X86BTest)
+                {
+                    _eh.ImmediateValue = op1.As<Immediate>().Int64;
+                    _eh.ImmediateLength = 1;
+
+                    _eh.OpCode = extendedInfo.SecondaryOpCode;
+                    _eh.Operand = ExtractO(_eh.OpCode);
+
+                    Add66HpBySize(op0.Size);
+                    AddRexWBySize(op0.Size);
+                    _eh.ModRmRegister = OpReg(op0);
+                    EmitX86(EmitType.X86R);
+                }
+                if (encoding == InstructionEncoding.X86Imul)
+                {
+                    _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
+                    _eh.OpCode |= 0x6B;
+
+                    if (op0.Size == 1) throw new ArgumentException();
+
+                    _eh.ImmediateValue = op1.As<Immediate>().Int64;
+                    _eh.ImmediateLength = 1;
+
+                    if (!_eh.ImmediateValue.IsInt8())
+                    {
+                        _eh.OpCode -= 2;
+                        _eh.ImmediateLength = op0.Size == 2 ? 2 : 4;
+                    }
+
+                    _eh.Operand = OpReg(op0);
+                    _eh.ModRmRegister = (int)_eh.Operand;
+                    EmitX86(EmitType.X86R);
+                }
+                if (encoding == InstructionEncoding.X86Mov)
+                { // 64-bit immediate in 64-bit mode is allowed.
+                    _eh.ImmediateValue = op1.As<Immediate>().Int64;
+                    _eh.ImmediateLength = op0.Size;
+
+                    _eh.Operand = 0;
+                    _eh.ModRmRegister = OpReg(op0);
+
+                    if (Constants.X64 && _eh.ImmediateLength == 8 && _eh.ImmediateValue.IsInt32())
+                    { // Optimize instruction size by using 32-bit immediate if possible.
+                        _eh.OpCode = 0xC7;
+                        AddRexW(1);
+                        _eh.ImmediateLength = 4;
+                        EmitX86(EmitType.X86R);
+                        //break;
+                    }
+                    else
+                    {
+                        _eh.OpCode = 0xB0 + ((op0.Size != 1).AsUInt() << 3);
+                        _eh.Operand = (uint)_eh.ModRmRegister;
+
+                        Add66HpBySize(_eh.ImmediateLength);
+                        AddRexWBySize(_eh.ImmediateLength);
+                        EmitX86(EmitType.X86OpWithOpReg);
+                    }
+                }
+                if (encoding == InstructionEncoding.X86MovPtr)
+                {
+                    if (OpReg(op0) != 0) throw new ArgumentException();
+
+                    _eh.OpCode += (op0.Size != 1).AsUInt();
+                    Add66HpBySize(op0.Size);
+                    AddRexWBySize(op0.Size);
+
+                    _eh.ImmediateValue = op1.As<Immediate>().Int64;
+                    _eh.ImmediateLength = Cpu.Info.RegisterSize;
+                    EmitX86(EmitType.X86Op);
+                }
+                if (encoding == InstructionEncoding.X86Rot)
+                {
+                    _eh.OpCode += (op0.Size != 1).AsUInt();
+                    Add66HpBySize(op0.Size);
+                    AddRexWBySize(op0.Size);
+
+                    _eh.ImmediateValue = op1.As<Immediate>().Int64 & 0xFF;
+                    _eh.ImmediateLength = (_eh.ImmediateValue != 1).AsInt();
+                    if (_eh.ImmediateLength != 0) _eh.OpCode -= 0x10;
+                    _eh.ModRmRegister = OpReg(op0);
+                    EmitX86(EmitType.X86R);
+                }
+                if (encoding == InstructionEncoding.ExtRmRi ||
+                    encoding == InstructionEncoding.ExtRmRi_P)
+                {
+                    _eh.OpCode = extendedInfo.SecondaryOpCode;
+                    _eh.Operand = ExtractO(_eh.OpCode);
+
+                    if (encoding == InstructionEncoding.ExtRmRi_P) Add66Hp((OpRegType(op0) == RegisterType.Xmm).AsByte());
+
+                    _eh.ImmediateValue = op1.As<Immediate>().Int64;
+                    _eh.ImmediateLength = 1;
+
+                    _eh.ModRmRegister = OpReg(op0);
+                    EmitX86(EmitType.X86R);
+                }
+                if (encoding == InstructionEncoding.X86Test)
+                {
+                    _eh.OpCode = extendedInfo.SecondaryOpCode + (op0.Size != 1).AsUInt();
+                    _eh.Operand = ExtractO(_eh.OpCode);
+
+                    _eh.ImmediateValue = op1.As<Immediate>().Int64;
+                    _eh.ImmediateLength = Math.Min(op0.Size, 4);
+
+                    Add66HpBySize(op0.Size);
+                    AddRexWBySize(op0.Size);
+
+                    // Alternate Form - AL, AX, EAX, RAX.
+                    if (OpReg(op0) == 0)
+                    {
+                        _eh.OpCode &= Constants.X86.InstOpCode_PP_66 | Constants.X86.InstOpCode_W;
+                        _eh.OpCode |= 0xA8 + (op0.Size != 1).AsUInt();
+                        EmitX86(EmitType.X86Op);
+                        //break;
+                    }
+                    else
+                    {
+                        _eh.ModRmRegister = OpReg(op0);
+                        EmitX86(EmitType.X86R);
+                    }
+                }
+            }
+            else if (OperandsAre(OperandType.Memory, OperandType.Immediate))
+            {
+                if (encoding == InstructionEncoding.X86Arith ||
+                    encoding == InstructionEncoding.X86Mov ||
+                    encoding == InstructionEncoding.X86BTest ||
+                    encoding == InstructionEncoding.X86Test)
+                {
+                    var memSize = op0.Size;
+                    if (memSize == 0) throw new ArgumentException();
+
+                    _eh.ImmediateValue = op1.As<Immediate>().Int64;
+                    if (encoding == InstructionEncoding.X86Arith)
+                    {
+                        _eh.ImmediateLength = _eh.ImmediateValue.IsInt8() ? 1 : Math.Min(memSize, 4);
+                        _eh.OpCode = 0x80;
+                        _eh.OpCode += (uint)(memSize != 1 ? (_eh.ImmediateLength != 1 ? 1 : 3) : 0);
+                    }
+                    else if (encoding == InstructionEncoding.X86Mov)
+                    {
+                        _eh.ImmediateLength = Math.Min(memSize, 4);
+                        _eh.OpCode = 0xC6 + (memSize != 1).AsUInt();
+                        _eh.Operand = 0;
+                    }
+                    else if (encoding == InstructionEncoding.X86BTest)
+                    {
+                        _eh.ImmediateLength = 1;
+                        _eh.OpCode = extendedInfo.SecondaryOpCode;
+                        _eh.Operand = ExtractO(_eh.OpCode);
+                    }
+                    else if (encoding == InstructionEncoding.X86Test)
+                    {
+                        _eh.ImmediateLength = Math.Min(memSize, 4);
+                        _eh.OpCode = extendedInfo.SecondaryOpCode + (memSize != 1).AsUInt();
+                        _eh.Operand = ExtractO(_eh.OpCode);
+                    }
+
+                    Add66HpBySize(memSize);
+                    AddRexWBySize(memSize);
+
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitX86(EmitType.X86M);
+                }
+                if (encoding == InstructionEncoding.X86Rot ||
+                    encoding == InstructionEncoding.ExtPrefetch)
+                {
+                    if (encoding == InstructionEncoding.X86Rot)
+                    {
+                        _eh.OpCode += (op0.Size != 1).AsUInt();
+                        Add66HpBySize(op0.Size);
+                        AddRexWBySize(op0.Size);
+
+                        if (op0.Size == 0) throw new ArgumentException();
+
+                        _eh.ImmediateValue = op1.As<Immediate>().Int64 & 0xFF;
+                        _eh.ImmediateLength = (_eh.ImmediateValue != 1).AsInt();
+                        if (_eh.ImmediateLength != 0) _eh.OpCode -= 0x10;
+                    }
+                    else if (encoding == InstructionEncoding.ExtPrefetch) _eh.Operand = op1.As<Immediate>().UInt32 & 0x3;
+
+                    _eh.ModRmMemory = OpMem(op0);
+                    EmitX86(EmitType.X86M);
+                }
+            }
+            else if (OperandsAre(OperandType.Immediate, OperandType.Immediate))
+            {
+                if (encoding == InstructionEncoding.X86Enter)
+                {
+                    EmitByte(0xC8);
+                    EmitWord(op1.As<Immediate>().UInt16);
+                    EmitByte(op0.As<Immediate>().UInt8);
+                    EmitDone();
+                }
+            }
+            else if (OperandsAre(OperandType.Immediate))
+            {
+                _eh.ImmediateValue = op0.As<Immediate>().Int64;
+                if (encoding == InstructionEncoding.X86Call ||
+                    encoding == InstructionEncoding.X86Jmp)
+                {
+                    _eh.OpCode = encoding == InstructionEncoding.X86Call ? extendedInfo.SecondaryOpCode : 0xE9;
+                    EmitJmpOrCallAbs();
+                }
+                if (encoding == InstructionEncoding.X86Int)
+                {
+                    var imm8 = (byte)(_eh.ImmediateValue & 0xFF);
+                    if (imm8 == 0x03) EmitOp(_eh.OpCode);
+                    else
+                    {
+                        EmitOp(_eh.OpCode + 1);
+                        EmitByte(imm8);
+                    }
+                    EmitDone();
+                }
+                if (encoding == InstructionEncoding.X86Push)
+                {
+                    _eh.ImmediateLength = _eh.ImmediateValue.IsInt8() ? 1 : 4;
+
+                    EmitByte((byte)(_eh.ImmediateLength == 1 ? 0x6A : 0x68));
+                    EmitImm();
+                }
+                if (encoding == InstructionEncoding.X86Ret)
+                {
+                    if (_eh.ImmediateValue == 0)
+                    {
+                        EmitByte(0xC3);
+                        EmitDone();
+                    }
+                    else
+                    {
+                        EmitByte(0xC2);
+                        _eh.ImmediateLength = 2;
+                        EmitImm();
+                    }
+                }
+            }
+            else if (OperandsAre(OperandType.Immediate, OperandType.Register))
+            {
+                if (encoding == InstructionEncoding.X86MovPtr)
+                {
+                    _eh.OpCode = extendedInfo.SecondaryOpCode;
+
+                    if (OpReg(op1) != 0) throw new ArgumentException();
+
+                    _eh.OpCode += (op1.Size != 1).AsUInt();
+                    Add66HpBySize(op1.Size);
+                    AddRexWBySize(op1.Size);
+
+                    _eh.ImmediateValue = op0.As<Immediate>().Int64;
+                    _eh.ImmediateLength = Cpu.Info.RegisterSize;
+                    EmitX86(EmitType.X86Op);
+                }
+            }
+            else if (OperandsAre(OperandType.Register, OperandType.Label))
+            {
+                if (encoding == InstructionEncoding.X86Jecxz)
+                {
+                    if (OpReg(op0) != 1) throw new ArgumentException();
+
+                    if (op0.Size == (Constants.X64 ? 4 : 2)) EmitByte(0x67);
+
+                    EmitByte(0xE3);
+                    _eh.Label = _assemblerBase.GetLabelData(op1.As<Label>().Id);
+
+                    if (_eh.Label.Offset != -1)
+                    { // Bound label.
+                        var offs = _eh.Label.Offset - Offset - 1;
+                        if (!offs.IsInt8()) throw new ArgumentException();
+
+                        EmitByte((byte)offs);
+                        EmitDone();
+                    }
+                    else
+                    { // Non-bound label.
+                        _eh.DisplacementOffset = -1;
+                        _eh.DisplacementSize = 1;
+                        _eh.RelocationId = -1;
+                        EmitDisplacement();
+                    }
+                }
+            }
+            else if (OperandsAre(OperandType.Label))
+            {
+                if (encoding == InstructionEncoding.X86Call ||
+                    encoding == InstructionEncoding.X86Jcc ||
+                    encoding == InstructionEncoding.X86Jmp)
+                {
+                    _eh.Label = _assemblerBase.GetLabelData(op0.As<Label>().Id);
+                    if (encoding == InstructionEncoding.X86Call) _eh.OpCode = extendedInfo.SecondaryOpCode;
+                    else if (encoding == InstructionEncoding.X86Jmp) _eh.OpCode = 0xE9;
+                    else if (encoding == InstructionEncoding.X86Jcc && _assemblerBase.HasFeature(AssemblerFeatures.PredictedJumps))
+                    {
+                        if (_eh.InstructionOptions.IsSet(InstructionOptions.Taken)) EmitByte(0x3E);
+                        if (_eh.InstructionOptions.IsSet(InstructionOptions.NotTaken)) EmitByte(0x2E);
+                    }
+
+                    if (_eh.Label.Offset != Constants.InvalidValue)
+                    { // Bound label.
+                        const int rel8Size = 2;
+                        int rel32Size = encoding == InstructionEncoding.X86Jcc ? 6 : 5;
+                        var offs = _eh.Label.Offset - Offset;
+                        if (encoding != InstructionEncoding.X86Jmp && offs > 0) throw new ArgumentException();
+                        if (encoding == InstructionEncoding.X86Call)
+                        {
+                            EmitOp(_eh.OpCode);
+                            EmitDWord(offs - rel32Size);
+                        }
+                        else if (!_eh.InstructionOptions.IsSet(InstructionOptions.LongForm) && (offs - rel8Size).IsInt8())
+                        {
+                            if (encoding == InstructionEncoding.X86Jcc) EmitOp(_eh.OpCode);
+                            else if (encoding == InstructionEncoding.X86Jmp) EmitByte(0xEB);
+                            EmitByte((byte)(offs - rel8Size));
+
+                            _eh.InstructionOptions |= InstructionOptions.ShortForm;
+                        }
+                        else
+                        {
+                            if (encoding == InstructionEncoding.X86Jcc)
+                            {
+                                EmitByte(0x0F);
+                                EmitOp(_eh.OpCode + 0x10);
+                            }
+                            else if (encoding == InstructionEncoding.X86Jmp) EmitByte(0xE9);
+                            EmitDWord(offs - rel32Size);
+
+                            _eh.InstructionOptions &= ~InstructionOptions.ShortForm;
+                        }
+                        EmitDone();
+                    }
+                    else
+                    { // Non-bound label.
+                        if (encoding == InstructionEncoding.X86Call)
+                        {
+                            EmitOp(_eh.OpCode);
+                            _eh.DisplacementOffset = -4;
+                            _eh.DisplacementSize = 4;
+                        }
+                        else if (_eh.InstructionOptions.IsSet(InstructionOptions.ShortForm))
+                        {
+                            if (encoding == InstructionEncoding.X86Jcc) EmitOp(_eh.OpCode);
+                            else if (encoding == InstructionEncoding.X86Jmp) EmitByte(0xEB);
+                            _eh.DisplacementOffset = -1;
+                            _eh.DisplacementSize = 1;
+                        }
+                        else
+                        {
+                            if (encoding == InstructionEncoding.X86Jcc)
+                            {
+                                EmitByte(0x0F);
+                                EmitOp(_eh.OpCode + 0x10);
+                            }
+                            else if (encoding == InstructionEncoding.X86Jmp) EmitByte(0xE9);
+                            _eh.DisplacementOffset = -4;
+                            _eh.DisplacementSize = 4;
+                        }
+                        _eh.RelocationId = -1;
+                        EmitDisplacement();
+                    }
+                }
+            }
+            else if (OperandsAre(OperandType.Invalid))
+            {
+                if (encoding == InstructionEncoding.X86Ret)
+                {
+                    EmitByte(0xC3);
+                    EmitDone();
+                }
+                if (encoding == InstructionEncoding.FpuCom)
+                {
+                    _eh.ModRmRegister = 1;
+                    EmitFpArith_Reg();
+                }
+                if (encoding == InstructionEncoding.FpuRDef)
+                {
+                    _eh.OpCode += 1;
+                    EmitFpuOp();
+                }
+            }
+
         }
 
         private bool OperandsAre(OperandType t0, OperandType t1 = OperandType.Invalid, OperandType t2 = OperandType.Invalid)
@@ -3159,9 +2636,9 @@ namespace AsmJit.Common
             _cursor += mmCode.Length;
         }
 
-        private void EmitX86(bool is86R = false, bool is86M = false) //default is X86Op
+        private void EmitX86(EmitType emitType)
         {
-            if (is86M) //X86M
+            if (emitType == EmitType.X86M)
             {
                 if (_eh.ModRmMemory == null) throw new ArgumentException();
 
@@ -3187,9 +2664,11 @@ namespace AsmJit.Common
                 // Rex prefix (64-bit only).
                 var rex = RexFromOpCodeAndOptions(_eh.OpCode, _eh.InstructionOptions);
 
-                if (is86R || is86M) rex += (_eh.Operand & 0x08) >> 1; // Rex.R (0x04).
-                if (is86R) rex += _eh.ModRmRegister >> 3; // Rex.B (0x01).
-                else if (is86M)
+                if (emitType == EmitType.X86R || emitType == EmitType.X86M) rex += (_eh.Operand & 0x08) >> 1; // Rex.R (0x04).
+
+                if (emitType == EmitType.X86OpWithOpReg) rex += _eh.Operand >> 3; // Rex.B (0x01).
+                else if (emitType == EmitType.X86R) rex += _eh.ModRmRegister >> 3; // Rex.B (0x01).
+                else if (emitType == EmitType.X86M)
                 {
                     rex += ((ulong)_eh.Index - 8 < 8).AsUInt() << 1; // Rex.X (0x02).
                     rex += ((ulong)_eh.Base - 8 < 8).AsUInt(); // Rex.B (0x01).
@@ -3198,67 +2677,27 @@ namespace AsmJit.Common
                 if ((rex & ~Constants.X86._InstOptionNoRex) != 0)
                 {
                     rex |= Constants.X86.ByteRex;
-                    if (is86R || is86M) _eh.Operand &= 0x07;
-                    if (is86R) _eh.ModRmRegister &= 0x07;
+                    if (emitType == EmitType.X86OpWithOpReg || emitType == EmitType.X86R || emitType == EmitType.X86M) _eh.Operand &= 0x07;
+                    if (emitType == EmitType.X86R) _eh.ModRmRegister &= 0x07;
                     EmitByte((byte)rex);
 
                     if (rex >= Constants.X86._InstOptionNoRex) throw new ArgumentException();
                 }
-                if (is86M) _eh.Base &= 0x07;
+                if (emitType == EmitType.X86M) _eh.Base &= 0x07;
             }
+
             // Instruction opcodes.
+            if (emitType == EmitType.X86OpWithOpReg) _eh.OpCode += _eh.Operand;
             EmitMm(_eh.OpCode);
             EmitOp(_eh.OpCode);
 
-            if (is86R) EmitByte((byte)EncodeMod(3, _eh.Operand, _eh.ModRmRegister)); // ModR.
-            if (is86M) EmitSib();
+            if (emitType == EmitType.X86R) EmitByte((byte)EncodeMod(3, _eh.Operand, _eh.ModRmRegister)); // ModR.
+            if (emitType == EmitType.X86M) EmitSib();
             else
             {
                 if (_eh.ImmediateLength != 0) EmitImm();
                 else EmitDone();
             }
-        }
-
-        private void EmitAvxM()
-        {
-            if (_eh.ModRmMemory == null) throw new ArgumentException("EmitContextData ModRmMemory is null");
-
-            if (_eh.ModRmMemory.HasSegment) EmitByte(_segmentPrefix[_eh.ModRmMemory.Segment]);
-
-            _eh.Base = _eh.ModRmMemory.Base;
-            _eh.Index = _eh.ModRmMemory.Index;
-
-            var vexXvvvvLpp = (_eh.OpCode >> (int)(Constants.X86.InstOpCode_W_Shift - 7)) & 0x80;
-            vexXvvvvLpp += (_eh.OpCode >> (int)(Constants.X86.InstOpCode_L_Shift - 2)) & 0x04;
-            vexXvvvvLpp += (_eh.OpCode >> (int)Constants.X86.InstOpCode_PP_Shift) & 0x03;
-            vexXvvvvLpp += _eh.Operand >> (int)(Constants.X86.VexVVVVShift - 3);
-
-            var vexRxbmmmmm = (_eh.OpCode >> (int)Constants.X86.InstOpCode_MM_Shift) & 0x0F;
-            vexRxbmmmmm |= ((ulong)_eh.Base - 8 < 8).AsUInt() << 5;
-            vexRxbmmmmm |= ((ulong)_eh.Index - 8 < 8).AsUInt() << 6;
-
-            if ((vexRxbmmmmm != 0x01) || (vexXvvvvLpp >= 0x80) || _eh.InstructionOptions.IsSet(InstructionOptions.Vex3))
-            {
-                vexRxbmmmmm |= (_eh.Operand << 4) & 0x80;
-                vexRxbmmmmm ^= 0xE0;
-                vexXvvvvLpp ^= 0x78;
-
-                EmitByte(Constants.X86.ByteVex3);
-                EmitByte((byte)vexRxbmmmmm);
-                EmitByte((byte)vexXvvvvLpp);
-                EmitOp(_eh.OpCode);
-            }
-            else
-            {
-                vexXvvvvLpp |= (_eh.Operand << 4) & 0x80;
-                vexXvvvvLpp ^= 0xF8;
-
-                EmitByte(Constants.X86.ByteVex2);
-                EmitByte((byte)vexXvvvvLpp);
-                EmitOp(_eh.OpCode);
-            }
-            _eh.Base &= 0x07;
-            _eh.Operand &= 0x07;
         }
 
         private void EmitAvxOp()
@@ -3286,60 +2725,126 @@ namespace AsmJit.Common
             EmitDone();
         }
 
-        private void EmitAvxR()
+        private void EmitAvxXop(EmitType emitType)
         {
-            var vexXvvvvLpp = (_eh.OpCode >> (int)(Constants.X86.InstOpCode_W_Shift - 7)) & 0x80;
-            vexXvvvvLpp += (_eh.OpCode >> (int)(Constants.X86.InstOpCode_L_Shift - 2)) & 0x04;
-            vexXvvvvLpp += (_eh.OpCode >> (int)Constants.X86.InstOpCode_PP_Shift) & 0x03;
-            vexXvvvvLpp += _eh.Operand >> (int)(Constants.X86.VexVVVVShift - 3);
-
-            var vexRxbmmmmm = (_eh.OpCode >> (int)Constants.X86.InstOpCode_MM_Shift) & 0x0F;
-            vexRxbmmmmm |= (_eh.ModRmRegister << 2) & 0x20;
-
-            if (vexRxbmmmmm != 0x01 || vexXvvvvLpp >= 0x80 || _eh.InstructionOptions.IsSet(InstructionOptions.Vex3))
+            if (emitType == EmitType.AvxM || emitType == EmitType.AvxMAndSib || emitType == EmitType.XopMAndSib)
             {
-                vexRxbmmmmm |= (_eh.Operand & 0x08) << 4;
-                vexRxbmmmmm ^= 0xE0;
-                vexXvvvvLpp ^= 0x78;
+                if (_eh.ModRmMemory == null) throw new ArgumentException("ModRmMemory is null");
 
-                EmitByte(Constants.X86.ByteVex3);
-                EmitOp(vexRxbmmmmm);
-                EmitOp(vexXvvvvLpp);
+                if (_eh.ModRmMemory.HasSegment) EmitByte(_segmentPrefix[_eh.ModRmMemory.Segment]);
+
+                _eh.Base = _eh.ModRmMemory.Base;
+                _eh.Index = _eh.ModRmMemory.Index;
+            }
+            var XvvvvLpp = (_eh.OpCode >> (int)(Constants.X86.InstOpCode_W_Shift - 7)) & 0x80;
+            XvvvvLpp += (_eh.OpCode >> (int)(Constants.X86.InstOpCode_L_Shift - 2)) & 0x04;
+            XvvvvLpp += (_eh.OpCode >> (int)Constants.X86.InstOpCode_PP_Shift) & 0x03;
+            XvvvvLpp += _eh.Operand >> (int)(Constants.X86.VexVVVVShift - 3);
+
+            var Rxbmmmmm = (_eh.OpCode >> (int)Constants.X86.InstOpCode_MM_Shift) & 0x0F;
+
+            if (emitType == EmitType.AvxM || emitType == EmitType.AvxMAndSib)
+            {
+                Rxbmmmmm |= ((ulong)_eh.Base - 8 < 8).AsUInt() << 5;
+                Rxbmmmmm |= ((ulong)_eh.Index - 8 < 8).AsUInt() << 6;
+
+                if ((Rxbmmmmm != 0x01) || (XvvvvLpp >= 0x80) || _eh.InstructionOptions.IsSet(InstructionOptions.Vex3))
+                {
+                    Rxbmmmmm |= (_eh.Operand << 4) & 0x80;
+                    Rxbmmmmm ^= 0xE0;
+                    XvvvvLpp ^= 0x78;
+
+                    EmitByte(Constants.X86.ByteVex3);
+                    EmitByte((byte)Rxbmmmmm);
+                    EmitByte((byte)XvvvvLpp);
+                    EmitOp(_eh.OpCode);
+                }
+                else
+                {
+                    XvvvvLpp |= (_eh.Operand << 4) & 0x80;
+                    XvvvvLpp ^= 0xF8;
+
+                    EmitByte(Constants.X86.ByteVex2);
+                    EmitByte((byte)XvvvvLpp);
+                    EmitOp(_eh.OpCode);
+                }
+            }
+            else if (emitType == EmitType.AvxR)
+            {
+                Rxbmmmmm |= (_eh.ModRmRegister << 2) & 0x20;
+
+                if (Rxbmmmmm != 0x01 || XvvvvLpp >= 0x80 || _eh.InstructionOptions.IsSet(InstructionOptions.Vex3))
+                {
+                    Rxbmmmmm |= (_eh.Operand & 0x08) << 4;
+                    Rxbmmmmm ^= 0xE0;
+                    XvvvvLpp ^= 0x78;
+
+                    EmitByte(Constants.X86.ByteVex3);
+                    EmitOp(Rxbmmmmm);
+                    EmitOp(XvvvvLpp);
+                    EmitOp(_eh.OpCode);
+
+                    _eh.ModRmRegister &= 0x07;
+                }
+                else
+                {
+                    XvvvvLpp += (_eh.Operand & 0x08) << 4;
+                    XvvvvLpp ^= 0xF8;
+
+                    EmitByte(Constants.X86.ByteVex2);
+                    EmitOp(XvvvvLpp);
+                    EmitOp(_eh.OpCode);
+                }
+            }
+            else if (emitType == EmitType.XopMAndSib)
+            {
+                Rxbmmmmm += ((ulong)_eh.Base - 8 < 8).AsUInt() << 5;
+                Rxbmmmmm += ((ulong)_eh.Index - 8 < 8).AsUInt() << 6;
+                Rxbmmmmm |= (_eh.Operand << 4) & 0x80;
+                Rxbmmmmm ^= 0xE0;
+                XvvvvLpp ^= 0x78;
+                EmitByte(Constants.X86.ByteXop3);
+                EmitByte((byte)Rxbmmmmm);
+                EmitByte((byte)XvvvvLpp);
                 EmitOp(_eh.OpCode);
-
+            }
+            else if (emitType == EmitType.XopR)
+            {
+                Rxbmmmmm |= (_eh.ModRmRegister << 2) & 0x20;
+                Rxbmmmmm |= (_eh.Operand & 0x08) << 4;
+                Rxbmmmmm ^= 0xE0;
+                XvvvvLpp ^= 0x78;
+                EmitByte(Constants.X86.ByteXop3);
+                EmitOp(Rxbmmmmm);
+                EmitOp(XvvvvLpp);
+                EmitOp(_eh.OpCode);
                 _eh.ModRmRegister &= 0x07;
             }
-            else
-            {
-                vexXvvvvLpp += (_eh.Operand & 0x08) << 4;
-                vexXvvvvLpp ^= 0xF8;
 
-                EmitByte(Constants.X86.ByteVex2);
-                EmitOp(vexXvvvvLpp);
-                EmitOp(_eh.OpCode);
+            if (emitType == EmitType.AvxM || emitType == EmitType.AvxMAndSib || emitType == EmitType.XopMAndSib)
+            {
+                _eh.Base &= 0x07;
+                _eh.Operand &= 0x07;
+                if (emitType == EmitType.AvxMAndSib || emitType == EmitType.XopMAndSib) EmitSib();
             }
-
-            EmitByte((byte)EncodeMod(3, _eh.Operand & 0x07, _eh.ModRmRegister));
-
-            if (_eh.ImmediateLength == 0)
+            else if (emitType == EmitType.AvxR || emitType == EmitType.XopR)
             {
+                EmitByte((byte)EncodeMod(3, _eh.Operand & 0x07, _eh.ModRmRegister));
+
+                if (_eh.ImmediateLength == 0)
+                {
+                    EmitDone();
+                    return;
+                }
+
+                EmitByte((byte)(_eh.ImmediateValue & 0xFF));
                 EmitDone();
-                return;
             }
-
-            EmitByte((byte)(_eh.ImmediateValue & 0xFF));
-            EmitDone();
-        }
-
-        private void EmitAvxMAndSib()
-        {
-            EmitAvxM();
-            EmitSib();
         }
 
         private void EmitAvxV()
         {
-            EmitAvxM();
+            EmitAvxXop(EmitType.AvxM);
 
             if (_eh.Index == -1/*unchecked((uint)_eh.Index) >= unchecked((uint)-1)*/) throw new ArgumentException();
 
@@ -3418,77 +2923,6 @@ namespace AsmJit.Common
             EmitDone();
         }
 
-        private void EmitXopR()
-        {
-            var xopXvvvvLpp = (_eh.OpCode >> (int)(Constants.X86.InstOpCode_W_Shift - 7)) & 0x80;
-            xopXvvvvLpp += (_eh.OpCode >> (int)(Constants.X86.InstOpCode_L_Shift - 2)) & 0x04;
-            xopXvvvvLpp += (_eh.OpCode >> (int)Constants.X86.InstOpCode_PP_Shift) & 0x03;
-            xopXvvvvLpp += _eh.Operand >> (int)(Constants.X86.VexVVVVShift - 3);
-
-            var xopRxbmmmmm = (_eh.OpCode >> (int)Constants.X86.InstOpCode_MM_Shift) & 0x0F;
-            xopRxbmmmmm |= (_eh.ModRmRegister << 2) & 0x20;
-
-            xopRxbmmmmm |= (_eh.Operand & 0x08) << 4;
-            xopRxbmmmmm ^= 0xE0;
-            xopXvvvvLpp ^= 0x78;
-
-            EmitByte(Constants.X86.ByteXop3);
-            EmitOp(xopRxbmmmmm);
-            EmitOp(xopXvvvvLpp);
-            EmitOp(_eh.OpCode);
-
-            _eh.ModRmRegister &= 0x07;
-            EmitByte((byte)EncodeMod(3, _eh.Operand & 0x07, _eh.ModRmRegister));
-
-            if (_eh.ImmediateLength == 0)
-            {
-                EmitDone();
-                return;
-            }
-
-            EmitByte((byte)(_eh.ImmediateValue & 0xFF));
-            EmitDone();
-        }
-
-        private void EmitXopM()
-        {
-            if (_eh.ModRmMemory == null) throw new ArgumentException();
-
-            if (_eh.ModRmMemory.HasSegment) EmitByte(_segmentPrefix[_eh.ModRmMemory.Segment]);
-
-            _eh.Base = _eh.ModRmMemory.Base;
-            _eh.Index = _eh.ModRmMemory.Index;
-
-            {
-                var vexXvvvvLpp = (_eh.OpCode >> (int)(Constants.X86.InstOpCode_W_Shift - 7)) & 0x80;
-                vexXvvvvLpp += (_eh.OpCode >> (int)(Constants.X86.InstOpCode_L_Shift - 2)) & 0x04;
-                vexXvvvvLpp += (_eh.OpCode >> (int)Constants.X86.InstOpCode_PP_Shift) & 0x03;
-                vexXvvvvLpp += _eh.Operand >> (int)(Constants.X86.VexVVVVShift - 3);
-
-                var vexRxbmmmmm = (_eh.OpCode >> (int)Constants.X86.InstOpCode_MM_Shift) & 0x0F;
-                vexRxbmmmmm += ((ulong)_eh.Base - 8 < 8).AsUInt() << 5;
-                vexRxbmmmmm += ((ulong)_eh.Index - 8 < 8).AsUInt() << 6;
-
-                vexRxbmmmmm |= (_eh.Operand << 4) & 0x80;
-                vexRxbmmmmm ^= 0xE0;
-                vexXvvvvLpp ^= 0x78;
-
-                EmitByte(Constants.X86.ByteXop3);
-                EmitByte((byte)vexRxbmmmmm);
-                EmitByte((byte)vexXvvvvLpp);
-                EmitOp(_eh.OpCode);
-            }
-
-            _eh.Base &= 0x07;
-            _eh.Operand &= 0x07;
-        }
-
-        private void EmitXopMAndSib()
-        {
-            EmitXopM();
-            EmitSib();
-        }
-
         private void EmitSib()
         {
             _eh.DisplacementOffset = _eh.ModRmMemory.Displacement;
@@ -3499,40 +2933,34 @@ namespace AsmJit.Common
                     if (_eh.Base == RegisterIndex.Sp)
                     {
                         if (_eh.DisplacementOffset == 0)
-                        {
-                            // [Esp/Rsp/R12].
+                        { // [Esp/Rsp/R12].
                             EmitByte((byte)EncodeMod(0, _eh.Operand, 4));
                             EmitByte((byte)EncodeSib(0, 4, 4));
                         }
                         else if (_eh.DisplacementOffset.IsInt8())
-                        {
-                            // [Esp/Rsp/R12 + Disp8].
+                        { // [Esp/Rsp/R12 + Disp8].
                             EmitByte((byte)EncodeMod(1, _eh.Operand, 4));
                             EmitByte((byte)EncodeSib(0, 4, 4));
                             EmitByte((byte)_eh.DisplacementOffset);
                         }
                         else
-                        {
-                            // [Esp/Rsp/R12 + Disp32].
+                        { // [Esp/Rsp/R12 + Disp32].
                             EmitByte((byte)EncodeMod(2, _eh.Operand, 4));
                             EmitByte((byte)EncodeSib(0, 4, 4));
                             EmitDWord(_eh.DisplacementOffset);
                         }
                     }
                     else if (_eh.Base != RegisterIndex.Bp && _eh.DisplacementOffset == 0)
-                    {
-                        // [Base].
+                    { // [Base].
                         EmitByte((byte)EncodeMod(0, _eh.Operand, _eh.Base));
                     }
                     else if (_eh.DisplacementOffset.IsInt8())
-                    {
-                        // [Base + Disp8].
+                    { // [Base + Disp8].
                         EmitByte((byte)EncodeMod(1, _eh.Operand, _eh.Base));
                         EmitByte((byte)_eh.DisplacementOffset);
                     }
                     else
-                    {
-                        // [Base + Disp32].
+                    { // [Base + Disp32].
                         EmitByte((byte)EncodeMod(2, _eh.Operand, _eh.Base));
                         EmitDWord(_eh.DisplacementOffset);
                     }
@@ -3546,21 +2974,18 @@ namespace AsmJit.Common
                     if (_eh.Index == RegisterIndex.Sp) throw new ArgumentException();
 
                     if (_eh.Base != RegisterIndex.Bp && _eh.DisplacementOffset == 0)
-                    {
-                        // [Base + Index * Scale].
+                    { // [Base + Index * Scale].
                         EmitByte((byte)EncodeMod(0, _eh.Operand, 4));
                         EmitByte((byte)EncodeSib(shift, _eh.Index, _eh.Base));
                     }
                     else if (_eh.DisplacementOffset.IsInt8())
-                    {
-                        // [Base + Index * Scale + Disp8].
+                    { // [Base + Index * Scale + Disp8].
                         EmitByte((byte)EncodeMod(1, _eh.Operand, 4));
                         EmitByte((byte)EncodeSib(shift, _eh.Index, _eh.Base));
                         EmitByte((byte)_eh.DisplacementOffset);
                     }
                     else
-                    {
-                        // [Base + Index * Scale + Disp32].
+                    { // [Base + Index * Scale + Disp32].
                         EmitByte((byte)EncodeMod(2, _eh.Operand, 4));
                         EmitByte((byte)EncodeSib(shift, _eh.Index, _eh.Base));
                         EmitDWord(_eh.DisplacementOffset);
@@ -3576,13 +3001,11 @@ namespace AsmJit.Common
                         case MemoryType.Absolute:
                             EmitByte((byte)EncodeMod(0, _eh.Operand, 4));
                             if (_eh.Index == -1 /*unchecked((uint)_eh.Index) >= unchecked((uint)-1)*/)
-                            {
-                                // [Disp32].
+                            { // [Disp32].
                                 EmitByte((byte)EncodeSib(0, 4, 5));
                             }
                             else
-                            {
-                                // [Disp32 + Index * Scale].
+                            { // [Disp32 + Index * Scale].
                                 _eh.Index &= 0x07;
                                 if (_eh.Index == RegisterIndex.Sp) throw new ArgumentException();
 
@@ -3630,13 +3053,11 @@ namespace AsmJit.Common
                 else
                 {
                     if (_eh.Index == -1 /*unchecked((uint)_eh.Index) >= unchecked((uint)-1)*/)
-                    {
-                        // [Disp32].
+                    { // [Disp32].
                         EmitByte((byte)EncodeMod(0, _eh.Operand, 5));
                     }
                     else
-                    {
-                        // [Index * Scale + Disp32].
+                    { // [Index * Scale + Disp32].
                         var shift = _eh.ModRmMemory.Shift;
                         if (_eh.Index == RegisterIndex.Sp) throw new ArgumentException();
 
@@ -3665,14 +3086,12 @@ namespace AsmJit.Common
                                 };
                                 _relocations.Add(rd);
                                 if (_eh.Label.Offset != -1)
-                                {
-                                    // Bound label.
+                                { // Bound label.
                                     _relocations[_eh.RelocationId].Data += _eh.Label.Offset;
                                     EmitDWord(0);
                                 }
                                 else
-                                {
-                                    // Non-bound label.
+                                { // Non-bound label.
                                     _eh.DisplacementOffset = -4 - _eh.ImmediateLength;
                                     _eh.DisplacementSize = 4;
                                     EmitDisplacement();
@@ -3681,8 +3100,7 @@ namespace AsmJit.Common
                             }
                             break;
                         default:
-                            {
-                                // RIP->Absolute [x86 mode].
+                            { // RIP->Absolute [x86 mode].
                                 _eh.RelocationId = _relocations.Count;
 
                                 var rd = new RelocationData
@@ -3731,67 +3149,7 @@ namespace AsmJit.Common
         {
             _eh.OpCode = _eh.Operand0.Size == 4 ? 0xD8u : 0xDC;
             _eh.ModRmMemory = OpMem(_eh.Operand0);
-            EmitX86(false, true);
-        }
-
-        private void EmitMmMovD()
-        {
-            _eh.Operand = OpReg(_eh.Operand0);
-            Add66Hp((OpRegType(_eh.Operand0) == RegisterType.Xmm).AsByte());
-
-            // Mm/Xmm <- Gp
-            if (OperandsAre(OperandType.Register, OperandType.Register) && _eh.Operand1.As<Register>().IsGp())
-            {
-                _eh.ModRmRegister = OpReg(_eh.Operand1);
-                EmitX86(true);
-                return;
-            }
-
-            // Mm/Xmm <- Mem
-            if (OperandsAre(OperandType.Register, OperandType.Memory))
-            {
-                _eh.ModRmMemory = OpMem(_eh.Operand1);
-                EmitX86(false, true);
-                return;
-            }
-
-            // The following instructions use the secondary opcode.
-            _eh.OpCode = _eh.SecondaryOpCode;
-            _eh.Operand = OpReg(_eh.Operand1);
-            Add66Hp((OpRegType(_eh.Operand1) == RegisterType.Xmm).AsByte());
-
-            // Gp <- Mm/Xmm
-            if (OperandsAre(OperandType.Register, OperandType.Register) && _eh.Operand0.As<Register>().IsGp())
-            {
-                _eh.ModRmRegister = OpReg(_eh.Operand0);
-                EmitX86(true);
-                return;
-            }
-
-            // X86Mem <- Mm/Xmm
-            if (!OperandsAre(OperandType.Memory, OperandType.Register)) return;
-            _eh.ModRmMemory = OpMem(_eh.Operand0);
-            EmitX86(false, true);
-        }
-
-        private void AvxRmMr_AfterRegRegCheck()
-        {
-            if (OperandsAre(OperandType.Register, OperandType.Memory))
-            {
-                _eh.Operand = OpReg(_eh.Operand0);
-                _eh.ModRmMemory = OpMem(_eh.Operand1);
-                EmitAvxMAndSib();
-                return;
-            }
-
-            // The following instruction uses the secondary opcode.
-            _eh.OpCode &= Constants.X86.InstOpCode_L_Mask;
-            _eh.OpCode |= _eh.SecondaryOpCode;
-
-            if (!OperandsAre(OperandType.Memory, OperandType.Register)) return;
-            _eh.Operand = OpReg(_eh.Operand1);
-            _eh.ModRmMemory = OpMem(_eh.Operand0);
-            EmitAvxMAndSib();
+            EmitX86(EmitType.X86M);
         }
 
         private void EmitDisplacement()
@@ -3821,56 +3179,13 @@ namespace AsmJit.Common
 
         private void EmitImm()
         {
-            switch (_eh.ImmediateLength)
-            {
-                case 1:
-                    EmitByte((byte)(_eh.ImmediateValue & 0x000000FF));
-                    break;
-                case 2:
-                    EmitWord((ushort)(_eh.ImmediateValue & 0x0000FFFF));
-                    break;
-                case 4:
-                    EmitDWord((int)(_eh.ImmediateValue & 0xFFFFFFFF));
-                    break;
-                case 8:
-                    EmitQWord(_eh.ImmediateValue);
-                    break;
+            if (_eh.ImmediateLength == 1) EmitByte((byte)(_eh.ImmediateValue & 0x000000FF));
+            else if (_eh.ImmediateLength == 2) EmitWord((ushort)(_eh.ImmediateValue & 0x0000FFFF));
+            else if (_eh.ImmediateLength == 4) EmitDWord((int)(_eh.ImmediateValue & 0xFFFFFFFF));
+            else if (_eh.ImmediateLength == 8) EmitQWord(_eh.ImmediateValue);
+            else throw new ArgumentException(string.Format("unknown immediateLength: {0}", _eh.ImmediateLength));
 
-                default:
-                    throw new ArgumentException(string.Format("unknown immediateLength: {0}", _eh.ImmediateLength));
-            }
             EmitDone();
-        }
-
-        private void EmitX86OpWithOpReg()
-        {
-            // Mandatory instruction prefix.
-            EmitPp(_eh.OpCode);
-
-            if (Constants.X64)
-            {
-                // Rex prefix (64-bit only).
-                var rex = RexFromOpCodeAndOptions(_eh.OpCode, _eh.InstructionOptions);
-
-                rex += _eh.Operand >> 3; // Rex.B (0x01).
-
-                if ((rex & ~Constants.X86._InstOptionNoRex) != 0)
-                {
-                    rex |= Constants.X86.ByteRex;
-                    _eh.Operand &= 0x07;
-                    EmitByte((byte)rex);
-
-                    if (rex >= Constants.X86._InstOptionNoRex) throw new ArgumentException();
-                }
-            }
-
-            // Instruction opcodes.
-            _eh.OpCode += _eh.Operand;
-            EmitMm(_eh.OpCode);
-            EmitOp(_eh.OpCode);
-
-            if (_eh.ImmediateLength != 0) EmitImm();
-            else EmitDone();
         }
 
         private void EmitJmpOrCallAbs()
@@ -3928,7 +3243,7 @@ namespace AsmJit.Common
             _eh.Operand = OpReg(_eh.Operand0);
 
             Add66HpBySize(_eh.Operand0.Size);
-            EmitX86OpWithOpReg();
+            EmitX86(EmitType.X86OpWithOpReg);
         }
 
         private void Add66Hp(byte value) => _eh.OpCode |= (uint)(value << (int)Constants.X86.InstOpCode_PP_Shift);
@@ -3954,23 +3269,26 @@ namespace AsmJit.Common
 
         private void EmitDone() { }
 
-        public static long EncodeMod(long m, long o, long rm)
+        public static long EncodeMod(long m, long Operand, long rm)
         {
             if (m > 3) throw new ArgumentException();
-            if (o > 7) throw new ArgumentException();
+            if (Operand > 7) throw new ArgumentException();
             if (rm > 7) throw new ArgumentException();
-            return (m << 6) + (o << 3) + rm;
+            return (m << 6) + (Operand << 3) + rm;
         }
 
         //! Encode SIB.
-        public static long EncodeSib(long s, long i, long b)
+        public static long EncodeSib(long Shift, long Index, long Base)
         {
-            if (s > 3) throw new ArgumentException();
-            if (i > 7) throw new ArgumentException();
-            if (b > 7) throw new ArgumentException();
-            return (s << 6) + (i << 3) + b;
+            if (Shift > 3) throw new ArgumentException();
+            if (Index > 7) throw new ArgumentException();
+            if (Base > 7) throw new ArgumentException();
+            return (Shift << 6) + (Index << 3) + Base;
         }
 
+        /// <summary>
+        /// Extract `O` field (R) from the opcode (specified as /0..7 in instruction manuals).
+        /// </summary>
         public static long ExtractO(long opcode) => (opcode >> (int)Constants.X86.InstOpCode_O_Shift) & 0x07;
 
         public static long RegAndVvvv(long regIndex, long vvvvIndex) => regIndex + (vvvvIndex << (int)Constants.X86.VexVVVVShift);

@@ -65,10 +65,7 @@ namespace AsmJit.Common.Operands
             {
                 unsafe
                 {
-                    if (Constants.X64)
-                    {
-                        fixed (long* p = _data.I64) p[0] = value;
-                    }
+                    if (Constants.X64) fixed (long* p = _data.I64) p[0] = value;
                     else
                     {
                         fixed (int* p = _data.I32)
@@ -95,10 +92,7 @@ namespace AsmJit.Common.Operands
             {
                 unsafe
                 {
-                    if (Constants.X64)
-                    {
-                        fixed (ulong* p = _data.U64) p[0] = value;
-                    }
+                    if (Constants.X64) fixed (ulong* p = _data.U64) p[0] = value;
                     else
                     {
                         fixed (uint* p = _data.U32)
@@ -124,10 +118,7 @@ namespace AsmJit.Common.Operands
             {
                 unsafe
                 {
-                    if (Constants.X64)
-                    {
-                        fixed (long* p = _data.I64) p[0] = value;
-                    }
+                    if (Constants.X64) fixed (long* p = _data.I64) p[0] = value;
                     else
                     {
                         fixed (int* p = _data.I32)
@@ -154,10 +145,7 @@ namespace AsmJit.Common.Operands
             {
                 unsafe
                 {
-                    if (Constants.X64)
-                    {
-                        fixed (ulong* p = _data.U64) p[0] = value;
-                    }
+                    if (Constants.X64) fixed (ulong* p = _data.U64) p[0] = value;
                     else
                     {
                         fixed (uint* p = _data.U32)
@@ -183,10 +171,7 @@ namespace AsmJit.Common.Operands
             {
                 unsafe
                 {
-                    if (Constants.X64)
-                    {
-                        fixed (long* p = _data.I64) p[0] = value;
-                    }
+                    if (Constants.X64) fixed (long* p = _data.I64) p[0] = value;
                     else
                     {
                         fixed (int* p = _data.I32)
@@ -234,10 +219,7 @@ namespace AsmJit.Common.Operands
             {
                 unsafe
                 {
-                    if (Constants.X64)
-                    {
-                        fixed (ulong* p = _data.U64) p[0] = value;
-                    }
+                    if (Constants.X64) fixed (ulong* p = _data.U64) p[0] = value;
                     else
                     {
                         fixed (uint* p = _data.U32)
@@ -353,16 +335,10 @@ namespace AsmJit.Common.Operands
 
         internal Immediate TruncateTo8Bits()
         {
-            if (Constants.X64)
+            unsafe
             {
-                unsafe
-                {
-                    fixed (ulong* p = _data.U64) p[0] &= 0x000000FFU;
-                }
-            }
-            else
-            {
-                unsafe
+                if (Constants.X64) fixed (ulong* p = _data.U64) p[0] &= 0x000000FFU;
+                else
                 {
                     fixed (uint* p = _data.U32)
                     {
@@ -376,16 +352,10 @@ namespace AsmJit.Common.Operands
 
         internal Immediate TruncateTo16Bits()
         {
-            if (Constants.X64)
+            unsafe
             {
-                unsafe
-                {
-                    fixed (ulong* p = _data.U64) p[0] &= 0x0000FFFFU;
-                }
-            }
-            else
-            {
-                unsafe
+                if (Constants.X64) fixed (ulong* p = _data.U64) p[0] &= 0x0000FFFFU;
+                else
                 {
                     fixed (uint* p = _data.U32)
                     {
@@ -401,10 +371,7 @@ namespace AsmJit.Common.Operands
         {
             unsafe
             {
-                fixed (uint* p = _data.U32)
-                {
-                    p[Utils.ArchIndex(2, 1)] = 0;
-                }
+                fixed (uint* p = _data.U32) p[Utils.ArchIndex(2, 1)] = 0;
             }
             return this;
         }

@@ -98,6 +98,7 @@
     <Compile Include="TestCases\JumpCross.cs" />
     <Compile Include="TestCases\JumpUnreachable1.cs" />
     <Compile Include="TestCases\JumpUnreachable2.cs" />
+    <Compile Include="TestCases\RawAssembler3.cs" />
     <Compile Include="TestCases\RawAssembler2.cs" />
     <Compile Include="TestCases\MiscConstPool.cs" />
     <Compile Include="TestCases\MiscMultiRet.cs" />

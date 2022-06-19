@@ -69,6 +69,15 @@ namespace AsmJitTest
             var disasm = new Disassembler(desArray, ArchitectureMode.x86_64, (ulong)fp.ToInt64(), true, Vendor.Any, 0UL);
             disassemly = disasm.Disassemble().Aggregate("", (current, insn) => current + insn + Environment.NewLine);
 
+            //Compile(_ctx);
+            //Execute(_ctx.Compile(out IntPtr fp, out int codeSize), out value, out expected);
+            //var tmp = Marshal.AllocHGlobal(codeSize);
+            //Buffer.MemoryCopy((void*)fp, (void*)tmp, codeSize, codeSize);
+
+            //var disasm = new Disassembler(tmp, codeSize, ArchitectureMode.x86_64, (ulong)fp.ToInt64(), true);
+            //disassemly = disasm.Disassemble().Aggregate("", (current, insn) => current + insn + Environment.NewLine);
+            //Marshal.FreeHGlobal(tmp);
+            
             return value == expected;
         }
 
