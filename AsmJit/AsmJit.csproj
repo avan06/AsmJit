@@ -1,174 +1,23 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{FC415F40-FDEE-463D-B8A9-84715FCD2D9D}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <TargetFrameworks>net48;net8.0</TargetFrameworks>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>$(AssemblyVersion)</FileVersion>
+    <Version>$(AssemblyVersion)</Version>
+    <Copyright>Copyright ©  2025</Copyright>
+    <Title>$(AssemblyName)</Title>
+    <Description></Description>
     <RootNamespace>AsmJit</RootNamespace>
     <AssemblyName>AsmJit</AssemblyName>
-    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <TargetFrameworkProfile />
+    <Product>$(AssemblyName)</Product>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <UseVSHostingProcess>false</UseVSHostingProcess>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-  </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
+
+  <!-- Conditionally obtain references for the .NET Framework 4.0 target -->
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net48' ">
     <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="AssemblerContext\Assembler.cs" />
-    <Compile Include="Common\CodeContextBase.cs" />
-    <Compile Include="Common\Enums\AssemblerFeatures.cs" />
-    <Compile Include="Common\AssemblerBase.cs" />
-    <Compile Include="Common\CodeBuffer.cs" />
-    <Compile Include="Common\Inst.cs" />
-    <Compile Include="Common\Operands\RegisterBase.cs" />
-    <Compile Include="CompilerContext\CompilerBase.cs" />
-    <Compile Include="Common\Data.cs" />
-    <Compile Include="Common\Enums\PointerFlags.cs" />
-    <Compile Include="Common\Enums\ProtectedMemoryMode.cs" />
-    <Compile Include="Common\Win32.cs" />
-    <Compile Include="Common\DelegateCreator.cs" />
-    <Compile Include="Common\Enums\Condition.cs" />
-    <Compile Include="AssemblerContext\CodeContext.cs" />
-    <Compile Include="CompilerContext\Allocator.cs" />
-    <Compile Include="CompilerContext\CallAllocator.cs" />
-    <Compile Include="CompilerContext\CodeContext.cs" />
-    <Compile Include="Common\DataBlock.cs" />
-    <Compile Include="CompilerContext\DataContext.cs" />
-    <Compile Include="CompilerContext\Intrinisics.cs" />
-    <Compile Include="CompilerContext\VariableAllocator.cs" />
-    <Compile Include="CompilerContext\CodeTree\DataNode.cs" />
-    <Compile Include="CompilerContext\CodeTree\HintNode.cs" />
-    <Compile Include="CompilerContext\CodeTree\ReturnNode.cs" />
-    <Compile Include="CompilerContext\CodeTree\VariableHint.cs" />
-    <Compile Include="CompilerContext\ConstantPool.cs" />
-    <Compile Include="Common\ExtendedInstructionInfo.cs" />
-    <Compile Include="Common\Enums\InstructionEncoding.cs" />
-    <Compile Include="Common\LabelData.cs" />
-    <Compile Include="Common\Enums\InstructionOptions.cs" />
-    <Compile Include="Common\LabelLink.cs" />
-    <Compile Include="Common\SpecialInstruction.cs" />
-    <Compile Include="Common\Enums\ArgumentPassingDirection.cs" />
-    <Compile Include="Common\Enums\CallingConvention.cs" />
-    <Compile Include="Common\UnsafeMemory.cs" />
-    <Compile Include="CompilerContext\CodeTree\FunctionDeclaration.cs" />
-    <Compile Include="Common\FunctionInOut.cs" />
-    <Compile Include="Common\Pointer.cs" />
-    <Compile Include="Common\Utils.cs" />
-    <Compile Include="Common\Enums\AligningMode.cs" />
-    <Compile Include="CompilerContext\CodeTree\AlignNode.cs" />
-    <Compile Include="CompilerContext\CodeTree\BitArray.cs" />
-    <Compile Include="Common\ValueSet.cs" />
-    <Compile Include="CompilerContext\CodeTree\CallArgumentNode.cs" />
-    <Compile Include="CompilerContext\CodeTree\CallNode.cs" />
-    <Compile Include="CompilerContext\CodeTree\FuncionNodeHints.cs" />
-    <Compile Include="CompilerContext\CodeTree\FunctionNode.cs" />
-    <Compile Include="CompilerContext\CodeTree\FunctionNodeFlags.cs" />
-    <Compile Include="CompilerContext\CodeTree\InstructionNode.cs" />
-    <Compile Include="CompilerContext\CodeTree\JumpNode.cs" />
-    <Compile Include="CompilerContext\CodeTree\LabelNode.cs" />
-    <Compile Include="CompilerContext\CodeTree\SentinelNode.cs" />
-    <Compile Include="CompilerContext\ConstantScope.cs" />
-    <Compile Include="CompilerContext\CodeProcessor.cs" />
-    <Compile Include="CompilerContext\Fetcher.cs" />
-    <Compile Include="CompilerContext\LivenessAnalyzer.cs" />
-    <Compile Include="CompilerContext\SArgData.cs" />
-    <Compile Include="CompilerContext\Translator.cs" />
-    <Compile Include="Common\Variables\VariableAttributes.cs" />
-    <Compile Include="Common\Variables\VariableCell.cs" />
-    <Compile Include="CompilerContext\VariableContext.cs" />
-    <Compile Include="Common\Variables\VariableData.cs" />
-    <Compile Include="Common\Variables\VariableFlags.cs" />
-    <Compile Include="Common\RegisterMask.cs" />
-    <Compile Include="CompilerContext\CodeTree\CodeNode.cs" />
-    <Compile Include="CompilerContext\CodeTree\CodeNodeFlags.cs" />
-    <Compile Include="CompilerContext\CodeTree\CodeNodeType.cs" />
-    <Compile Include="CompilerContext\Compiler.cs" />
-    <Compile Include="Common\Variables\VariableInfo.cs" />
-    <Compile Include="Common\Variables\VariableMap.cs" />
-    <Compile Include="Common\Variables\VariableState.cs" />
-    <Compile Include="Common\Variables\VariableUsage.cs" />
-    <Compile Include="Common\Variables\VariableValueFlags.cs" />
-    <Compile Include="Common\Cpu.cs" />
-    <Compile Include="Common\Extensions\ArrayExtensions.cs" />
-    <Compile Include="Common\Extensions\BooleanExtensions.cs" />
-    <Compile Include="Common\Extensions\EnumExtensions.cs" />
-    <Compile Include="Common\Extensions\NumericExtensions.cs" />
-    <Compile Include="CompilerContext\CodeTree\FnPointer.cs" />
-    <Compile Include="Common\Operands\FpVariable.cs" />
-    <Compile Include="Common\Operands\FpVariableType.cs" />
-    <Compile Include="Common\Operands\GpVariableType.cs" />
-    <Compile Include="Common\Operands\Label.cs" />
-    <Compile Include="Common\Operands\Memory.cs" />
-    <Compile Include="Common\Operands\MemoryType.cs" />
-    <Compile Include="Common\Operands\MmVariable.cs" />
-    <Compile Include="Common\Extensions\VariableTypeExtensions.cs" />
-    <Compile Include="Common\Operands\FpRegister.cs" />
-    <Compile Include="Common\Operands\GpRegister.cs" />
-    <Compile Include="Common\Operands\GpRegisterType.cs" />
-    <Compile Include="Common\Operands\GpVariable.cs" />
-    <Compile Include="Common\Operands\Immediate.cs" />
-    <Compile Include="Common\Operands\Invalid.cs" />
-    <Compile Include="Common\Operands\KRegister.cs" />
-    <Compile Include="Common\Operands\MmRegister.cs" />
-    <Compile Include="Common\Operands\Operand.cs" />
-    <Compile Include="Common\Constants.cs" />
-    <Compile Include="Common\Operands\OperandType.cs" />
-    <Compile Include="Common\Operands\RegisterIndex.cs" />
-    <Compile Include="Common\Operands\RipRegister.cs" />
-    <Compile Include="Common\Operands\SegRegister.cs" />
-    <Compile Include="Common\Operands\StackMemory.cs" />
-    <Compile Include="Common\Operands\XmmRegister.cs" />
-    <Compile Include="Common\Operands\XmmVariable.cs" />
-    <Compile Include="Common\Operands\XmmVariableType.cs" />
-    <Compile Include="Common\Operands\YmmRegister.cs" />
-    <Compile Include="Common\Operands\YmmVariable.cs" />
-    <Compile Include="Common\Operands\YmmVariableType.cs" />
-    <Compile Include="Common\Operands\ZmmRegister.cs" />
-    <Compile Include="Common\Operands\ZmmVariableType.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Common\Operands\Register.cs" />
-    <Compile Include="Common\Operands\RegisterType.cs" />
-    <Compile Include="Common\Operands\Variable.cs" />
-    <Compile Include="Common\Operands\VariableType.cs" />
-    <Compile Include="Common\Enums\RegisterClass.cs" />
-    <Compile Include="Common\RegisterCount.cs" />
-  </ItemGroup>
-  <ItemGroup />
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+
 </Project>

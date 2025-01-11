@@ -1,0 +1,3 @@
+[submodule "SharpDisasm"]
+	path = SharpDisasm
+	url = https://github.com/avan06/SharpDisasm.git
